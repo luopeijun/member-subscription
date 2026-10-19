@@ -29,5 +29,5 @@ const port = Number(process.env.PORT || 5173)
 const host = process.env.HOST || '127.0.0.1'
 
 app.listen(port, host, () => {
-  console.log(`\n  订阅账本已启动：http://localhost:${port}\n`)
+  console.log(`\n  会员订阅已启动：http://localhost:${port}\n`)
 })

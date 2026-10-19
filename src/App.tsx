@@ -24,7 +24,7 @@ const TABS: { id: Tab; label: string }[] = [
 const PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
   dashboard: {
     title: '总览',
-    subtitle: '年化支出、到期提醒和现金流，一眼看完',
+    subtitle: '月均成本、到期提醒和现金流，一眼看完',
   },
   subscriptions: {
     title: '会员',
@@ -265,7 +265,7 @@ export default function App() {
           <button className="brand" onClick={() => setTab('dashboard')}>
             <span className="brand-mark">¥</span>
             <span className="brand-text">
-              <strong>订阅账本</strong>
+              <strong>会员订阅</strong>
             </span>
           </button>
 
