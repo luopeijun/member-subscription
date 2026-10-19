@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { AppState, Payment } from '../types'
 import { formatCNY } from '../../shared/money'
 import { EmptyState } from '../ui'
-import { Pagination } from '../Pagination'
+import { Pagination } from '../components/Pagination'
 
 type Props = {
   state: AppState
