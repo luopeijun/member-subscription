@@ -1,6 +1,13 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
 import { api } from './api'
-import type { AppState, Payment, Plan, Snapshot, Subscription } from './types'
+import type {
+  AppState,
+  JointRenewal,
+  Payment,
+  Plan,
+  Snapshot,
+  Subscription,
+} from './types'
 import { Dashboard } from './pages/Dashboard'
 import { Subscriptions } from './pages/Subscriptions'
 import { Payments } from './pages/Payments'
@@ -11,7 +18,7 @@ import {
   SnapshotForm,
   SubscriptionForm,
 } from './components/forms'
-import { JointForm } from './components/JointForm'
+import { JointRenewForm } from './components/JointRenewForm'
 
 type Tab = 'dashboard' | 'subscriptions' | 'payments' | 'compare'
 
@@ -45,7 +52,7 @@ type ModalState =
   | { kind: 'add' }
   | { kind: 'edit'; subscription: Subscription }
   | { kind: 'renew'; subscription: Subscription }
-  | { kind: 'joint'; subscription?: Subscription }
+  | { kind: 'jointRenew' }
   | { kind: 'payment' }
   | { kind: 'snapshot'; plan: Plan }
   | { kind: 'plan' }
@@ -57,6 +64,7 @@ type ImportSummary = {
   servicesAdded: number
   plansAdded: number
   subscriptionsAdded: number
+  jointRenewalsAdded: number
   paymentsAdded: number
   snapshotsAdded: number
 }
@@ -126,6 +134,26 @@ export default function App() {
     try {
       setState(await api<AppState>(`/payments/${payment.id}`, { method: 'DELETE' }))
       notify('已删除支付记录')
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
+  const handleDeleteJointRenewal = async (jointRenewal: JointRenewal) => {
+    if (
+      !window.confirm(
+        `删除 ${jointRenewal.paidAt} 的联合续费记录？\n会同时删除关联的 ${jointRenewal.members.length} 笔支付，但不会回退会员到期日。`,
+      )
+    ) {
+      return
+    }
+    try {
+      setState(
+        await api<AppState>(`/joint-renewals/${jointRenewal.id}`, {
+          method: 'DELETE',
+        }),
+      )
+      notify('已删除联合续费记录')
     } catch (error) {
       notify((error as Error).message, 'err')
     }
@@ -227,9 +255,15 @@ export default function App() {
       })
       setState(next)
       const counts = next.imported
-      notify(
-        `导入完成：会员 ${counts.subscriptionsAdded} 条、支付 ${counts.paymentsAdded} 笔、报价 ${counts.snapshotsAdded} 条`,
-      )
+      const parts = [
+        `会员 ${counts.subscriptionsAdded} 条`,
+        `支付 ${counts.paymentsAdded} 笔`,
+        `报价 ${counts.snapshotsAdded} 条`,
+      ]
+      if (counts.jointRenewalsAdded > 0) {
+        parts.push(`联合续费 ${counts.jointRenewalsAdded} 条`)
+      }
+      notify(`导入完成：${parts.join('、')}`)
     } catch (error) {
       notify(`导入失败：${(error as Error).message}`, 'err')
     }
@@ -307,8 +341,7 @@ export default function App() {
           <Subscriptions
             state={state}
             onAdd={() => setModal({ kind: 'add' })}
-            onAddJoint={() => setModal({ kind: 'joint' })}
-            onJoint={(subscription) => setModal({ kind: 'joint', subscription })}
+            onJointRenew={() => setModal({ kind: 'jointRenew' })}
             onEdit={(subscription) => setModal({ kind: 'edit', subscription })}
             onRenew={(subscription) => setModal({ kind: 'renew', subscription })}
             onDelete={(subscription) => void handleDeleteSubscription(subscription)}
@@ -320,6 +353,9 @@ export default function App() {
             state={state}
             onAdd={() => setModal({ kind: 'payment' })}
             onDelete={(payment) => void handleDeletePayment(payment)}
+            onDeleteJointRenewal={(jointRenewal) =>
+              void handleDeleteJointRenewal(jointRenewal)
+            }
           />
         ) : null}
 
@@ -376,10 +412,9 @@ export default function App() {
         />
       ) : null}
 
-      {modal?.kind === 'joint' ? (
-        <JointForm
+      {modal?.kind === 'jointRenew' ? (
+        <JointRenewForm
           state={state}
-          main={modal.subscription}
           onClose={closeModal}
           onSaved={handleSaved}
         />

@@ -1797,6 +1797,21 @@ code {
   line-height: 1.4;
 }
 
+.joint-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.joint-add-row select {
+  flex: 1;
+}
+
+.joint-add-row .btn,
+.joint-member .btn {
+  flex: none;
+}
+
 .joint-members {
   display: flex;
   flex-direction: column;
@@ -1826,6 +1841,10 @@ code {
 .joint-member.active {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.joint-member.picked {
+  cursor: default;
 }
 
 .joint-member input {
@@ -1859,54 +1878,77 @@ code {
   white-space: nowrap;
 }
 
-.joint-mode input[type='radio'],
-.joint-member input[type='checkbox'],
-.joint-reallocate input[type='checkbox'] {
-  flex: none;
-  width: auto;
-  min-height: 0;
-  height: auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.joint-reallocate {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin: 14px 0;
-  padding: 10px 12px;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-.joint-reallocate input {
-  margin: 2px 0 0;
-  accent-color: var(--accent);
-}
-
-.joint-reallocate div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.joint-reallocate strong {
-  font-size: 13px;
-}
-
-.joint-reallocate span {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .joint-summary {
   padding: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ------------------------- 联合续费记录（流水） ------------------------- */
+
+.section-title {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.joint-renewal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.joint-renewal-card {
+  padding: 14px 16px;
+}
+
+.joint-renewal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.joint-renewal-head strong {
+  display: block;
+  font-size: 14px;
+}
+
+.joint-renewal-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.joint-renewal-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.joint-renewal-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #f6f7fa;
+  font-size: 12px;
+}
+
+.joint-renewal-member em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.joint-renewal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
 }
