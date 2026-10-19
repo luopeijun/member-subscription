@@ -91,13 +91,14 @@ export function exportAll() {
     subscriptions: db
       .prepare(
         `SELECT id, plan_id, platform, account, started_at, next_renewal_override,
-          auto_renew, status, shared_with, note, created_at
+          auto_renew, status, shared_with, note, joint_parent_id, joint_cost_mode, created_at
          FROM subscriptions ORDER BY id`,
       )
       .all(),
     payments: db
       .prepare(
-        'SELECT id, subscription_id, paid_at, amount, note, created_at FROM payments ORDER BY id',
+        `SELECT id, subscription_id, paid_at, amount, note, joint_purchase_id, created_at
+         FROM payments ORDER BY id`,
       )
       .all(),
     snapshots: db
@@ -154,12 +155,12 @@ export function importAll(payload: unknown): ImportSummary {
     const insertSubscription = db.prepare(
       `INSERT INTO subscriptions
         (plan_id, platform, account, started_at, next_renewal_override,
-         auto_renew, status, shared_with, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         auto_renew, status, shared_with, note, joint_cost_mode, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertPayment = db.prepare(
-      `INSERT INTO payments (subscription_id, paid_at, amount, note, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO payments (subscription_id, paid_at, amount, note, joint_purchase_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
     const insertSnapshot = db.prepare(
       `INSERT INTO price_snapshots (plan_id, captured_at, price, cycle_months, platform, note, created_at)
@@ -220,6 +221,7 @@ export function importAll(payload: unknown): ImportSummary {
       }
       const autoRenew =
         row.auto_renew === true || row.auto_renew === 1 || row.auto_renew === '1' ? 1 : 0
+      const jointCostMode = row.joint_cost_mode === 'main' ? 'main' : 'split'
       const info = insertSubscription.run(
         planId,
         optionalText(row.platform, 60),
@@ -230,10 +232,27 @@ export function importAll(payload: unknown): ImportSummary {
         normalizeStatus(row.status),
         optionalText(row.shared_with, 120),
         optionalText(row.note),
+        jointCostMode,
         createdStamp(row.created_at),
       )
       subscriptionMap.set(oldId, Number(info.lastInsertRowid))
       summary.subscriptionsAdded += 1
+    }
+
+    const setJointParent = db.prepare(
+      'UPDATE subscriptions SET joint_parent_id = ? WHERE id = ?',
+    )
+    for (const row of subscriptions) {
+      if (row.joint_parent_id === null || row.joint_parent_id === undefined) continue
+      const childId = subscriptionMap.get(integer(row.id, '会员 id', 1))
+      const parentId = subscriptionMap.get(
+        integer(row.joint_parent_id, '联合会员主记录', 1),
+      )
+      if (!childId || !parentId) {
+        throw new HttpError(400, '联合会员引用了不存在的会员')
+      }
+      if (childId === parentId) continue
+      setJointParent.run(parentId, childId)
     }
 
     for (const row of payments) {
@@ -248,6 +267,7 @@ export function importAll(payload: unknown): ImportSummary {
         date(row.paid_at, '支付日期'),
         integer(row.amount, '支付金额', 0),
         optionalText(row.note),
+        optionalText(row.joint_purchase_id, 80),
         createdStamp(row.created_at),
       )
       summary.paymentsAdded += 1

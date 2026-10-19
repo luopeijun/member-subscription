@@ -22,6 +22,16 @@ export type PaymentLite = {
   amount: number
 }
 
+export type JointCostMode = 'split' | 'main'
+
+export type JointChild = {
+  id: number
+  serviceName: string
+  planName: string
+  nextRenewalAt: string | null
+  status: string
+}
+
 export type Subscription = {
   id: number
   planId: number
@@ -38,6 +48,10 @@ export type Subscription = {
   status: string
   sharedWith: string | null
   note: string | null
+  jointParentId: number | null
+  jointParentName: string | null
+  jointCostMode: JointCostMode
+  jointChildren: JointChild[]
   lastPayment: PaymentLite | null
   prevPayment: PaymentLite | null
   nextRenewalAt: string | null
@@ -56,6 +70,7 @@ export type Payment = {
   paidAt: string
   amount: number
   note: string | null
+  jointPurchaseId: string | null
 }
 
 export type Snapshot = {

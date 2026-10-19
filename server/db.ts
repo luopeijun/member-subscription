@@ -42,6 +42,8 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'active',
     shared_with TEXT,
     note TEXT,
+    joint_parent_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL,
+    joint_cost_mode TEXT NOT NULL DEFAULT 'split',
     created_at TEXT NOT NULL
   );
 
@@ -51,6 +53,7 @@ db.exec(`
     paid_at TEXT NOT NULL,
     amount INTEGER NOT NULL,
     note TEXT,
+    joint_purchase_id TEXT,
     created_at TEXT NOT NULL
   );
 
@@ -68,6 +71,34 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_payments_sub ON payments(subscription_id, paid_at);
   CREATE INDEX IF NOT EXISTS idx_subs_plan ON subscriptions(plan_id);
   CREATE INDEX IF NOT EXISTS idx_snapshots_plan ON price_snapshots(plan_id, captured_at);
+`)
+
+const subscriptionColumns = db.prepare('PRAGMA table_info(subscriptions)').all() as {
+  name: string
+}[]
+if (!subscriptionColumns.some((column) => column.name === 'joint_parent_id')) {
+  db.exec(
+    `ALTER TABLE subscriptions
+     ADD COLUMN joint_parent_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL`,
+  )
+}
+if (!subscriptionColumns.some((column) => column.name === 'joint_cost_mode')) {
+  db.exec(
+    `ALTER TABLE subscriptions
+     ADD COLUMN joint_cost_mode TEXT NOT NULL DEFAULT 'split'`,
+  )
+}
+
+const paymentColumns = db.prepare('PRAGMA table_info(payments)').all() as {
+  name: string
+}[]
+if (!paymentColumns.some((column) => column.name === 'joint_purchase_id')) {
+  db.exec('ALTER TABLE payments ADD COLUMN joint_purchase_id TEXT')
+}
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_subs_joint ON subscriptions(joint_parent_id);
+  CREATE INDEX IF NOT EXISTS idx_payments_joint ON payments(joint_purchase_id);
 `)
 
 const snapshotColumns = db.prepare('PRAGMA table_info(price_snapshots)').all() as {
