@@ -30,8 +30,6 @@ type SubRow = {
   status: string
   shared_with: string | null
   note: string | null
-  joint_parent_id: number | null
-  joint_cost_mode: string
 }
 
 type PaymentRow = {
@@ -40,18 +38,29 @@ type PaymentRow = {
   paid_at: string
   amount: number
   note: string | null
-  joint_purchase_id: string | null
+  joint_renewal_id: number | null
   service_name: string
   plan_name: string
   cycle_months: number
 }
 
-type JointChild = {
+type JointRenewalRow = {
   id: number
-  serviceName: string
-  planName: string
-  nextRenewalAt: string | null
-  status: string
+  main_subscription_id: number | null
+  paid_at: string
+  total: number
+  cycle_months: number
+  cost_mode: string
+  note: string | null
+  main_service_name: string | null
+}
+
+type JointMemberRow = {
+  joint_renewal_id: number
+  subscription_id: number
+  amount: number
+  service_name: string
+  plan_name: string
 }
 
 type SnapshotRow = {
@@ -93,7 +102,8 @@ export function buildState() {
 
   const paymentRows = db
     .prepare(
-      `SELECT pay.id, pay.subscription_id, pay.paid_at, pay.amount, pay.note, pay.joint_purchase_id,
+      `SELECT pay.id, pay.subscription_id, pay.paid_at, pay.amount, pay.note,
+        pay.joint_renewal_id,
         s.name AS service_name, pl.name AS plan_name, pl.cycle_months
       FROM payments pay
       JOIN subscriptions sub ON sub.id = pay.subscription_id
@@ -102,6 +112,38 @@ export function buildState() {
       ORDER BY pay.paid_at, pay.id`,
     )
     .all() as PaymentRow[]
+
+  const jointRenewalRows = db
+    .prepare(
+      `SELECT jr.id, jr.main_subscription_id, jr.paid_at, jr.total, jr.cycle_months,
+        jr.cost_mode, jr.note, s.name AS main_service_name
+      FROM joint_renewals jr
+      LEFT JOIN subscriptions sub ON sub.id = jr.main_subscription_id
+      LEFT JOIN plans pl ON pl.id = sub.plan_id
+      LEFT JOIN services s ON s.id = pl.service_id
+      ORDER BY jr.paid_at DESC, jr.id DESC`,
+    )
+    .all() as JointRenewalRow[]
+
+  const jointMemberRows = db
+    .prepare(
+      `SELECT pay.joint_renewal_id, pay.subscription_id, pay.amount,
+        s.name AS service_name, pl.name AS plan_name
+      FROM payments pay
+      JOIN subscriptions sub ON sub.id = pay.subscription_id
+      JOIN plans pl ON pl.id = sub.plan_id
+      JOIN services s ON s.id = pl.service_id
+      WHERE pay.joint_renewal_id IS NOT NULL
+      ORDER BY pay.id`,
+    )
+    .all() as JointMemberRow[]
+
+  const jointMembersByRenewal = new Map<number, JointMemberRow[]>()
+  for (const member of jointMemberRows) {
+    const list = jointMembersByRenewal.get(member.joint_renewal_id) ?? []
+    list.push(member)
+    jointMembersByRenewal.set(member.joint_renewal_id, list)
+  }
 
   const snapshotRows = db
     .prepare(
@@ -159,10 +201,6 @@ export function buildState() {
       status: sub.status,
       sharedWith: sub.shared_with,
       note: sub.note,
-      jointParentId: sub.joint_parent_id,
-      jointParentName: null as string | null,
-      jointCostMode: sub.joint_cost_mode === 'main' ? 'main' : 'split',
-      jointChildren: [] as JointChild[],
       lastPayment: last
         ? { id: last.id, paidAt: last.paid_at, amount: last.amount }
         : null,
@@ -177,21 +215,6 @@ export function buildState() {
       priceChangePct,
     }
   })
-
-  const subscriptionById = new Map(subscriptions.map((sub) => [sub.id, sub]))
-  for (const sub of subscriptions) {
-    if (sub.jointParentId === null) continue
-    const parent = subscriptionById.get(sub.jointParentId)
-    if (!parent) continue
-    sub.jointParentName = parent.serviceName
-    parent.jointChildren.push({
-      id: sub.id,
-      serviceName: sub.serviceName,
-      planName: sub.planName,
-      nextRenewalAt: sub.nextRenewalAt,
-      status: sub.status,
-    })
-  }
 
   const active = subscriptions.filter((sub) => sub.status === 'active')
   const annualized = active.reduce((sum, sub) => sum + sub.annualized, 0)
@@ -274,7 +297,23 @@ export function buildState() {
       paidAt: payment.paid_at,
       amount: payment.amount,
       note: payment.note,
-      jointPurchaseId: payment.joint_purchase_id,
+      jointRenewalId: payment.joint_renewal_id,
+    })),
+    jointRenewals: jointRenewalRows.map((renewal) => ({
+      id: renewal.id,
+      mainSubscriptionId: renewal.main_subscription_id,
+      mainServiceName: renewal.main_service_name,
+      paidAt: renewal.paid_at,
+      total: renewal.total,
+      cycleMonths: renewal.cycle_months,
+      costMode: renewal.cost_mode === 'main' ? 'main' : 'split',
+      note: renewal.note,
+      members: (jointMembersByRenewal.get(renewal.id) ?? []).map((member) => ({
+        subscriptionId: member.subscription_id,
+        serviceName: member.service_name,
+        planName: member.plan_name,
+        amount: member.amount,
+      })),
     })),
     snapshots: snapshotRows.map((snapshot) => ({
       id: snapshot.id,

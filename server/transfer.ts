@@ -6,6 +6,7 @@ export type ImportSummary = {
   servicesAdded: number
   plansAdded: number
   subscriptionsAdded: number
+  jointRenewalsAdded: number
   paymentsAdded: number
   snapshotsAdded: number
 }
@@ -91,13 +92,20 @@ export function exportAll() {
     subscriptions: db
       .prepare(
         `SELECT id, plan_id, platform, account, started_at, next_renewal_override,
-          auto_renew, status, shared_with, note, joint_parent_id, joint_cost_mode, created_at
+          auto_renew, status, shared_with, note, created_at
          FROM subscriptions ORDER BY id`,
+      )
+      .all(),
+    jointRenewals: db
+      .prepare(
+        `SELECT id, main_subscription_id, paid_at, total, cycle_months,
+          cost_mode, note, created_at
+         FROM joint_renewals ORDER BY id`,
       )
       .all(),
     payments: db
       .prepare(
-        `SELECT id, subscription_id, paid_at, amount, note, joint_purchase_id, created_at
+        `SELECT id, subscription_id, paid_at, amount, note, joint_renewal_id, created_at
          FROM payments ORDER BY id`,
       )
       .all(),
@@ -123,6 +131,10 @@ export function importAll(payload: unknown): ImportSummary {
   const services = asArray(root.services, '服务列表')
   const plans = asArray(root.plans, '套餐列表')
   const subscriptions = asArray(root.subscriptions, '会员列表')
+  const jointRenewals = asArray(
+    root.jointRenewals ?? root.joint_renewals,
+    '联合续费列表',
+  )
   const payments = asArray(root.payments, '支付列表')
   const snapshots = asArray(root.snapshots, '比价列表')
 
@@ -130,6 +142,7 @@ export function importAll(payload: unknown): ImportSummary {
     servicesAdded: 0,
     plansAdded: 0,
     subscriptionsAdded: 0,
+    jointRenewalsAdded: 0,
     paymentsAdded: 0,
     snapshotsAdded: 0,
   }
@@ -155,11 +168,16 @@ export function importAll(payload: unknown): ImportSummary {
     const insertSubscription = db.prepare(
       `INSERT INTO subscriptions
         (plan_id, platform, account, started_at, next_renewal_override,
-         auto_renew, status, shared_with, note, joint_cost_mode, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         auto_renew, status, shared_with, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    const insertJointRenewal = db.prepare(
+      `INSERT INTO joint_renewals
+        (main_subscription_id, paid_at, total, cycle_months, cost_mode, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertPayment = db.prepare(
-      `INSERT INTO payments (subscription_id, paid_at, amount, note, joint_purchase_id, created_at)
+      `INSERT INTO payments (subscription_id, paid_at, amount, note, joint_renewal_id, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
     const insertSnapshot = db.prepare(
@@ -221,7 +239,6 @@ export function importAll(payload: unknown): ImportSummary {
       }
       const autoRenew =
         row.auto_renew === true || row.auto_renew === 1 || row.auto_renew === '1' ? 1 : 0
-      const jointCostMode = row.joint_cost_mode === 'main' ? 'main' : 'split'
       const info = insertSubscription.run(
         planId,
         optionalText(row.platform, 60),
@@ -232,27 +249,33 @@ export function importAll(payload: unknown): ImportSummary {
         normalizeStatus(row.status),
         optionalText(row.shared_with, 120),
         optionalText(row.note),
-        jointCostMode,
         createdStamp(row.created_at),
       )
       subscriptionMap.set(oldId, Number(info.lastInsertRowid))
       summary.subscriptionsAdded += 1
     }
 
-    const setJointParent = db.prepare(
-      'UPDATE subscriptions SET joint_parent_id = ? WHERE id = ?',
-    )
-    for (const row of subscriptions) {
-      if (row.joint_parent_id === null || row.joint_parent_id === undefined) continue
-      const childId = subscriptionMap.get(integer(row.id, '会员 id', 1))
-      const parentId = subscriptionMap.get(
-        integer(row.joint_parent_id, '联合会员主记录', 1),
-      )
-      if (!childId || !parentId) {
-        throw new HttpError(400, '联合会员引用了不存在的会员')
+    const jointRenewalMap = new Map<number, number>()
+    for (const row of jointRenewals) {
+      const oldId = integer(row.id, '联合续费 id', 1)
+      const rawMainId = row.main_subscription_id
+      let mainSubscriptionId: number | null = null
+      if (rawMainId !== null && rawMainId !== undefined) {
+        mainSubscriptionId =
+          subscriptionMap.get(integer(rawMainId, '联合续费主会员', 1)) ?? null
       }
-      if (childId === parentId) continue
-      setJointParent.run(parentId, childId)
+      const cycleMonths = normalizeCycle(row.cycle_months ?? 12) || 12
+      const info = insertJointRenewal.run(
+        mainSubscriptionId,
+        date(row.paid_at, '联合续费日期'),
+        integer(row.total, '联合续费总额', 0),
+        cycleMonths,
+        row.cost_mode === 'main' ? 'main' : 'split',
+        optionalText(row.note),
+        createdStamp(row.created_at),
+      )
+      jointRenewalMap.set(oldId, Number(info.lastInsertRowid))
+      summary.jointRenewalsAdded += 1
     }
 
     for (const row of payments) {
@@ -262,12 +285,18 @@ export function importAll(payload: unknown): ImportSummary {
       if (!subscriptionId) {
         throw new HttpError(400, '支付记录引用了不存在的会员')
       }
+      const rawJointRenewalId = row.joint_renewal_id
+      let jointRenewalId: number | null = null
+      if (rawJointRenewalId !== null && rawJointRenewalId !== undefined) {
+        jointRenewalId =
+          jointRenewalMap.get(integer(rawJointRenewalId, '联合续费记录', 1)) ?? null
+      }
       insertPayment.run(
         subscriptionId,
         date(row.paid_at, '支付日期'),
         integer(row.amount, '支付金额', 0),
         optionalText(row.note),
-        optionalText(row.joint_purchase_id, 80),
+        jointRenewalId,
         createdStamp(row.created_at),
       )
       summary.paymentsAdded += 1

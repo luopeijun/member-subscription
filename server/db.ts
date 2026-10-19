@@ -42,8 +42,17 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'active',
     shared_with TEXT,
     note TEXT,
-    joint_parent_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL,
-    joint_cost_mode TEXT NOT NULL DEFAULT 'split',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS joint_renewals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    main_subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL,
+    paid_at TEXT NOT NULL,
+    total INTEGER NOT NULL,
+    cycle_months INTEGER NOT NULL,
+    cost_mode TEXT NOT NULL DEFAULT 'split',
+    note TEXT,
     created_at TEXT NOT NULL
   );
 
@@ -53,7 +62,7 @@ db.exec(`
     paid_at TEXT NOT NULL,
     amount INTEGER NOT NULL,
     note TEXT,
-    joint_purchase_id TEXT,
+    joint_renewal_id INTEGER REFERENCES joint_renewals(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL
   );
 
@@ -76,30 +85,131 @@ db.exec(`
 const subscriptionColumns = db.prepare('PRAGMA table_info(subscriptions)').all() as {
   name: string
 }[]
-if (!subscriptionColumns.some((column) => column.name === 'joint_parent_id')) {
-  db.exec(
-    `ALTER TABLE subscriptions
-     ADD COLUMN joint_parent_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL`,
-  )
-}
-if (!subscriptionColumns.some((column) => column.name === 'joint_cost_mode')) {
-  db.exec(
-    `ALTER TABLE subscriptions
-     ADD COLUMN joint_cost_mode TEXT NOT NULL DEFAULT 'split'`,
-  )
-}
-
 const paymentColumns = db.prepare('PRAGMA table_info(payments)').all() as {
   name: string
 }[]
-if (!paymentColumns.some((column) => column.name === 'joint_purchase_id')) {
-  db.exec('ALTER TABLE payments ADD COLUMN joint_purchase_id TEXT')
+
+if (!paymentColumns.some((column) => column.name === 'joint_renewal_id')) {
+  db.exec(
+    `ALTER TABLE payments
+     ADD COLUMN joint_renewal_id INTEGER REFERENCES joint_renewals(id) ON DELETE CASCADE`,
+  )
 }
 
-db.exec(`
-  CREATE INDEX IF NOT EXISTS idx_subs_joint ON subscriptions(joint_parent_id);
-  CREATE INDEX IF NOT EXISTS idx_payments_joint ON payments(joint_purchase_id);
-`)
+if (subscriptionColumns.some((column) => column.name === 'joint_parent_id')) {
+  // Earlier versions stored joint memberships as persistent parent/child links.
+  // Convert each group's latest purchase into one historical joint renewal record.
+  const groups = db
+    .prepare(
+      `SELECT parent.id AS parent_id
+       FROM subscriptions parent
+       WHERE EXISTS (
+         SELECT 1 FROM subscriptions child WHERE child.joint_parent_id = parent.id
+       )
+       ORDER BY parent.id`,
+    )
+    .all() as { parent_id: number }[]
+
+  const insertJoint = db.prepare(
+    `INSERT INTO joint_renewals
+      (main_subscription_id, paid_at, total, cycle_months, cost_mode, note, created_at)
+     VALUES (?, ?, ?, ?, 'main', ?, ?)`,
+  )
+  const linkPayment = db.prepare(
+    'UPDATE payments SET joint_renewal_id = ? WHERE id = ?',
+  )
+
+  for (const group of groups) {
+    const parent = db
+      .prepare(
+        `SELECT s.id, p.cycle_months
+         FROM subscriptions s
+         JOIN plans p ON p.id = s.plan_id
+         WHERE s.id = ?`,
+      )
+      .get(group.parent_id) as
+      | { id: number; cycle_months: number }
+      | undefined
+    if (!parent) continue
+
+    const latest = db
+      .prepare(
+        `SELECT paid_at FROM payments
+         WHERE subscription_id = ?
+         ORDER BY paid_at DESC, id DESC LIMIT 1`,
+      )
+      .get(parent.id) as { paid_at: string } | undefined
+    if (!latest) continue
+
+    const childIds = (
+      db
+        .prepare('SELECT id FROM subscriptions WHERE joint_parent_id = ? ORDER BY id')
+        .all(parent.id) as { id: number }[]
+    ).map((row) => row.id)
+    const memberIds = [parent.id, ...childIds]
+    const placeholders = memberIds.map(() => '?').join(', ')
+    const rows = db
+      .prepare(
+        `SELECT id, amount FROM payments
+         WHERE paid_at = ? AND subscription_id IN (${placeholders})
+         ORDER BY id`,
+      )
+      .all(latest.paid_at, ...memberIds) as { id: number; amount: number }[]
+    if (rows.length === 0) continue
+
+    const total = rows.reduce((sum, row) => sum + row.amount, 0)
+    if (total <= 0) continue
+
+    const info = insertJoint.run(
+      parent.id,
+      latest.paid_at,
+      total,
+      parent.cycle_months > 0 ? parent.cycle_months : 12,
+      '从旧联合会员关系迁移',
+      new Date().toISOString(),
+    )
+    const jointRenewalId = Number(info.lastInsertRowid)
+    for (const row of rows) {
+      linkPayment.run(jointRenewalId, row.id)
+    }
+  }
+
+  db.exec('UPDATE subscriptions SET joint_parent_id = NULL')
+
+  // The old binding model tagged bundled members with a placeholder platform/note.
+  // Those relationships now live in joint_renewals, so drop the misleading tags.
+  db.exec("UPDATE subscriptions SET platform = NULL WHERE platform = '联合会员'")
+  db.exec("UPDATE subscriptions SET note = NULL WHERE note GLOB '联合会员（*'")
+}
+
+// Best-effort cleanup of columns used by the old persistent-group model.
+db.exec('DROP INDEX IF EXISTS idx_subs_joint')
+db.exec('DROP INDEX IF EXISTS idx_payments_joint')
+if (subscriptionColumns.some((column) => column.name === 'joint_parent_id')) {
+  try {
+    db.exec('ALTER TABLE subscriptions DROP COLUMN joint_parent_id')
+  } catch {
+    // Older SQLite builds may not support DROP COLUMN; the column is unused.
+  }
+}
+if (subscriptionColumns.some((column) => column.name === 'joint_cost_mode')) {
+  try {
+    db.exec('ALTER TABLE subscriptions DROP COLUMN joint_cost_mode')
+  } catch {
+    // Older SQLite builds may not support DROP COLUMN; the column is unused.
+  }
+}
+if (paymentColumns.some((column) => column.name === 'joint_purchase_id')) {
+  try {
+    db.exec('ALTER TABLE payments DROP COLUMN joint_purchase_id')
+  } catch {
+    // Older SQLite builds may not support DROP COLUMN; the column is unused.
+  }
+}
+
+db.exec(
+  'CREATE INDEX IF NOT EXISTS idx_payments_joint_renewal ON payments(joint_renewal_id)',
+)
 
 const snapshotColumns = db.prepare('PRAGMA table_info(price_snapshots)').all() as {
   name: string
