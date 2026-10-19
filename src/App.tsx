@@ -1,0 +1,401 @@
+import { useEffect, useState, type ChangeEvent } from 'react'
+import { api } from './api'
+import type { AppState, Payment, Plan, Snapshot, Subscription } from './types'
+import { Dashboard } from './pages/Dashboard'
+import { Subscriptions } from './pages/Subscriptions'
+import { Payments } from './pages/Payments'
+import { Compare } from './pages/Compare'
+import {
+  PaymentForm,
+  PlanForm,
+  SnapshotForm,
+  SubscriptionForm,
+} from './forms'
+
+type Tab = 'dashboard' | 'subscriptions' | 'payments' | 'compare'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'dashboard', label: '总览' },
+  { id: 'subscriptions', label: '会员' },
+  { id: 'payments', label: '流水' },
+  { id: 'compare', label: '比价' },
+]
+
+const PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
+  dashboard: {
+    title: '总览',
+    subtitle: '年化支出、到期提醒和现金流，一眼看完',
+  },
+  subscriptions: {
+    title: '会员',
+    subtitle: '每个会员的实际价格、周期和下次扣款',
+  },
+  payments: {
+    title: '支付流水',
+    subtitle: '每一次续费花了多少钱，都在这里',
+  },
+  compare: {
+    title: '比价',
+    subtitle: '我买的价格，和其他平台报的价格',
+  },
+}
+
+type ModalState =
+  | { kind: 'add' }
+  | { kind: 'edit'; subscription: Subscription }
+  | { kind: 'renew'; subscription: Subscription }
+  | { kind: 'payment' }
+  | { kind: 'snapshot'; plan: Plan }
+  | { kind: 'plan' }
+  | null
+
+type Toast = { message: string; kind: 'ok' | 'err' }
+
+type ImportSummary = {
+  servicesAdded: number
+  plansAdded: number
+  subscriptionsAdded: number
+  paymentsAdded: number
+  snapshotsAdded: number
+}
+
+export default function App() {
+  const [state, setState] = useState<AppState | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('dashboard')
+  const [modal, setModal] = useState<ModalState>(null)
+  const [toast, setToast] = useState<Toast | null>(null)
+
+  const load = async () => {
+    setLoadError(null)
+    try {
+      setState(await api<AppState>('/state'))
+    } catch (error) {
+      setLoadError((error as Error).message)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 3500)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const notify = (message: string, kind: Toast['kind'] = 'ok') => {
+    setToast({ message, kind })
+  }
+
+  const closeModal = () => setModal(null)
+
+  const handleSaved = (next: AppState, message: string) => {
+    setState(next)
+    setModal(null)
+    notify(message)
+  }
+
+  const handleDeleteSubscription = async (subscription: Subscription) => {
+    if (
+      !window.confirm(
+        `删除「${subscription.serviceName} · ${subscription.planName}」？\n相关支付流水会一并删除，且无法恢复。`,
+      )
+    ) {
+      return
+    }
+    try {
+      setState(await api<AppState>(`/subscriptions/${subscription.id}`, { method: 'DELETE' }))
+      notify('已删除会员')
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
+  const handleDeletePayment = async (payment: Payment) => {
+    if (
+      !window.confirm(
+        `删除 ${payment.paidAt} 的支付记录？\n${payment.serviceName} · ${payment.planName}`,
+      )
+    ) {
+      return
+    }
+    try {
+      setState(await api<AppState>(`/payments/${payment.id}`, { method: 'DELETE' }))
+      notify('已删除支付记录')
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
+  const handleDeletePlan = async (plan: Plan) => {
+    if (!window.confirm(`删除候选套餐「${plan.serviceName} · ${plan.name}」及其比价记录？`)) {
+      return
+    }
+    try {
+      setState(await api<AppState>(`/plans/${plan.id}`, { method: 'DELETE' }))
+      notify('已删除套餐')
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
+  const handleDeleteSnapshot = async (snapshot: Snapshot) => {
+    if (
+      !window.confirm(
+        `删除「${snapshot.platform ?? '未标注'}」在 ${snapshot.capturedAt} 记录的报价？`,
+      )
+    ) {
+      return
+    }
+    try {
+      setState(await api<AppState>(`/snapshots/${snapshot.id}`, { method: 'DELETE' }))
+      notify('已删除报价')
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
+  const handleSeed = async () => {
+    if (state && (state.services.length > 0 || state.plans.length > 0)) {
+      notify('已有数据，请先清空后再载入示例数据', 'err')
+      return
+    }
+    try {
+      setState(await api<AppState>('/seed', { method: 'POST' }))
+      notify('示例数据已载入')
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
+  const handleReset = async () => {
+    if (!window.confirm('清空所有会员、支付流水和比价记录？此操作不可恢复。')) return
+    if (!window.confirm('最后确认：真的要清空全部数据吗？')) return
+    try {
+      setState(
+        await api<AppState>('/data', {
+          method: 'DELETE',
+          body: JSON.stringify({ confirm: 'DELETE' }),
+        }),
+      )
+      notify('数据已清空')
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
+  const handleExportData = () => {
+    const filename = `subledger-${state?.today ?? 'backup'}.json`
+    const link = document.createElement('a')
+    link.href = '/api/export/json'
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    notify(`已导出 ${filename}`)
+  }
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) return
+    if (
+      !window.confirm(
+        `导入「${file.name}」？\n数据会以插入方式追加，不会覆盖现有数据。`,
+      )
+    ) {
+      return
+    }
+
+    try {
+      const text = await file.text()
+      let payload: unknown
+      try {
+        payload = JSON.parse(text)
+      } catch {
+        throw new Error('文件内容不是有效的 JSON')
+      }
+
+      const next = await api<AppState & { imported: ImportSummary }>('/import/json', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+      setState(next)
+      const counts = next.imported
+      notify(
+        `导入完成：会员 ${counts.subscriptionsAdded} 条、支付 ${counts.paymentsAdded} 笔、报价 ${counts.snapshotsAdded} 条`,
+      )
+    } catch (error) {
+      notify(`导入失败：${(error as Error).message}`, 'err')
+    }
+  }
+
+  if (loadError) {
+    return (
+      <div className="boot">
+        <div className="card card-pad boot-card">
+          <h1>加载失败</h1>
+          <p className="muted">{loadError}</p>
+          <button className="btn primary" onClick={() => void load()}>
+            重试
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!state) {
+    return (
+      <div className="boot">
+        <div className="spinner" />
+        <p className="muted">正在读取本地数据…</p>
+      </div>
+    )
+  }
+
+  const meta = PAGE_META[tab]
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <div className="topbar-inner">
+          <button className="brand" onClick={() => setTab('dashboard')}>
+            <span className="brand-mark">¥</span>
+            <span className="brand-text">
+              <strong>订阅账本</strong>
+            </span>
+          </button>
+
+          <nav className="nav">
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-item ${tab === item.id ? 'active' : ''}`}
+                onClick={() => setTab(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="top-actions">
+            <button className="btn primary" onClick={() => setModal({ kind: 'add' })}>
+              + 添加会员
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="container">
+        <div className="page-head">
+          <div>
+            <h1>{meta.title}</h1>
+            <p>{meta.subtitle}</p>
+          </div>
+          <span className="today-pill">今天 {state.today}</span>
+        </div>
+
+        {tab === 'dashboard' ? (
+          <Dashboard
+            state={state}
+            onAdd={() => setModal({ kind: 'add' })}
+            onSeed={handleSeed}
+            onRenew={(subscription) => setModal({ kind: 'renew', subscription })}
+          />
+        ) : null}
+
+        {tab === 'subscriptions' ? (
+          <Subscriptions
+            state={state}
+            onAdd={() => setModal({ kind: 'add' })}
+            onEdit={(subscription) => setModal({ kind: 'edit', subscription })}
+            onRenew={(subscription) => setModal({ kind: 'renew', subscription })}
+            onDelete={(subscription) => void handleDeleteSubscription(subscription)}
+          />
+        ) : null}
+
+        {tab === 'payments' ? (
+          <Payments
+            state={state}
+            onAdd={() => setModal({ kind: 'payment' })}
+            onDelete={(payment) => void handleDeletePayment(payment)}
+          />
+        ) : null}
+
+        {tab === 'compare' ? (
+          <Compare
+            state={state}
+            onAddPlan={() => setModal({ kind: 'plan' })}
+            onSnapshot={(plan) => setModal({ kind: 'snapshot', plan })}
+            onDeletePlan={(plan) => void handleDeletePlan(plan)}
+            onDeleteSnapshot={(snapshot) => void handleDeleteSnapshot(snapshot)}
+          />
+        ) : null}
+
+        <footer className="app-foot">
+          <div className="foot-actions">
+            <label className="link-action">
+              导入数据
+              <input
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={(event) => void handleImportFile(event)}
+              />
+            </label>
+            <button className="link-action" onClick={handleExportData}>
+              导出数据
+            </button>
+            <button className="link-danger" onClick={() => void handleReset()}>
+              清空全部数据
+            </button>
+          </div>
+        </footer>
+      </main>
+
+      {modal?.kind === 'add' ? (
+        <SubscriptionForm state={state} onClose={closeModal} onSaved={handleSaved} />
+      ) : null}
+
+      {modal?.kind === 'edit' ? (
+        <SubscriptionForm
+          state={state}
+          editing={modal.subscription}
+          onClose={closeModal}
+          onSaved={handleSaved}
+        />
+      ) : null}
+
+      {modal?.kind === 'renew' ? (
+        <PaymentForm
+          state={state}
+          subscription={modal.subscription}
+          onClose={closeModal}
+          onSaved={handleSaved}
+        />
+      ) : null}
+
+      {modal?.kind === 'payment' ? (
+        <PaymentForm state={state} onClose={closeModal} onSaved={handleSaved} />
+      ) : null}
+
+      {modal?.kind === 'snapshot' ? (
+        <SnapshotForm
+          plan={modal.plan}
+          today={state.today}
+          onClose={closeModal}
+          onSaved={handleSaved}
+        />
+      ) : null}
+
+      {modal?.kind === 'plan' ? (
+        <PlanForm state={state} onClose={closeModal} onSaved={handleSaved} />
+      ) : null}
+
+      {toast ? <div className={`toast ${toast.kind}`}>{toast.message}</div> : null}
+    </div>
+  )
+}
