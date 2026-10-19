@@ -78,6 +78,16 @@ function status(value: unknown): string {
   return value
 }
 
+const CYCLE_MONTHS = new Set([0, 1, 3, 6, 12])
+
+function cycle(value: unknown): number {
+  const months = integer(value, '周期', 0, 120)
+  if (!CYCLE_MONTHS.has(months)) {
+    throw new HttpError(400, '计费周期只能是月付、季付、半年付、年付或一次性')
+  }
+  return months
+}
+
 function idParam(value: string, label: string): number {
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -189,7 +199,7 @@ apiRouter.post(
     const serviceName = text(body.serviceName, '服务名称', 80)
     const category = text(body.category, '类别', 30)
     const planName = text(body.planName, '套餐名称', 80)
-    const cycleMonths = integer(body.cycleMonths, '周期', 0, 120)
+    const cycleMonths = cycle(body.cycleMonths)
     const listPrice = integer(body.listPrice ?? 0, '标价', 0, 1_000_000_000_000)
     const platform = optionalText(body.platform, 60)
     const account = optionalText(body.account, 120)
@@ -256,7 +266,7 @@ apiRouter.put(
 
     const category = text(body.category ?? '其他', '类别', 30)
     const planName = text(body.planName ?? planRow.name, '套餐名称', 80)
-    const cycleMonths = integer(body.cycleMonths ?? planRow.cycle_months, '周期', 0, 120)
+    const cycleMonths = cycle(body.cycleMonths ?? planRow.cycle_months)
     const listPrice = integer(
       body.listPrice ?? planRow.list_price,
       '标价',
@@ -334,7 +344,7 @@ apiRouter.post(
     const serviceName = text(body.serviceName, '服务名称', 80)
     const category = text(body.category, '类别', 30)
     const planName = text(body.planName, '套餐名称', 80)
-    const cycleMonths = integer(body.cycleMonths, '周期', 0, 120)
+    const cycleMonths = cycle(body.cycleMonths)
     const listPrice = integer(body.listPrice ?? 0, '标价', 0, 1_000_000_000_000)
     const note = optionalText(body.note, 300)
 

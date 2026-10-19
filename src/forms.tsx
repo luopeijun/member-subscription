@@ -75,7 +75,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
       serviceName: '',
       category: '影音娱乐',
       planName: '',
-      cycleMonths: 1,
+      cycleMonths: 12,
       listPrice: '',
       platform: '官网',
       account: '',
@@ -239,9 +239,6 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
                   {item.label}
                 </option>
               ))}
-              {!CYCLE_OPTIONS.some((item) => item.value === form.cycleMonths) ? (
-                <option value={form.cycleMonths}>{form.cycleMonths} 个月</option>
-              ) : null}
             </select>
           </div>
         </div>
@@ -651,7 +648,7 @@ export function PlanForm({ state, onClose, onSaved }: PlanFormProps) {
   const [serviceName, setServiceName] = useState('')
   const [category, setCategory] = useState('影音娱乐')
   const [planName, setPlanName] = useState('')
-  const [cycleMonths, setCycleMonths] = useState(1)
+  const [cycleMonths, setCycleMonths] = useState(12)
   const [listPrice, setListPrice] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)

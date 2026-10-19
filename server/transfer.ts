@@ -68,6 +68,13 @@ function normalizeStatus(value: unknown): string {
   return 'active'
 }
 
+const CYCLE_MONTHS = new Set([0, 1, 3, 6, 12])
+
+function normalizeCycle(value: unknown): number {
+  const months = integer(value, '套餐周期', 0, 120)
+  return CYCLE_MONTHS.has(months) ? months : 12
+}
+
 export function exportAll() {
   return {
     app: 'subledger',
@@ -180,7 +187,7 @@ export function importAll(payload: unknown): ImportSummary {
         throw new HttpError(400, '套餐引用了不存在的服务')
       }
       const name = requiredText(row.name, '套餐名称', 80)
-      const cycleMonths = integer(row.cycle_months, '套餐周期', 0, 120)
+      const cycleMonths = normalizeCycle(row.cycle_months)
       const listPrice = integer(row.list_price ?? 0, '套餐标价', 0)
       const note = optionalText(row.note)
       const existing = findPlan.get(serviceId, name, cycleMonths) as
