@@ -5,7 +5,7 @@ import {
   EmptyState,
   cycleLabel,
   formatDay,
-} from '../ui'
+} from '../components/ui'
 
 type Props = {
   state: AppState

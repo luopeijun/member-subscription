@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { api } from './api'
-import type { AppState, Plan, Subscription } from './types'
+import { api } from '../api'
+import type { AppState, Plan, Subscription } from '../types'
 import {
   CATEGORIES,
   CYCLE_OPTIONS,
@@ -8,7 +8,7 @@ import {
   PLATFORM_SUGGESTIONS,
   STATUS_OPTIONS,
 } from './ui'
-import { toMajor, toMinor } from '../shared/money'
+import { toMajor, toMinor } from '../../shared/money'
 
 type SavedHandler = (next: AppState, message: string) => void
 

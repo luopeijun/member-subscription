@@ -1,6 +1,6 @@
 import type { AppState, Subscription } from '../types'
 import { formatCNY } from '../../shared/money'
-import { DaysBadge, EmptyState, monthLabel } from '../ui'
+import { DaysBadge, EmptyState, monthLabel } from '../components/ui'
 
 type DashboardProps = {
   state: AppState

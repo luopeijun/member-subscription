@@ -10,7 +10,7 @@ import {
   PlanForm,
   SnapshotForm,
   SubscriptionForm,
-} from './forms'
+} from './components/forms'
 
 type Tab = 'dashboard' | 'subscriptions' | 'payments' | 'compare'
 

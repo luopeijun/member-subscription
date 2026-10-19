@@ -7,7 +7,7 @@ import {
   StatusBadge,
   cycleLabel,
   formatDate,
-} from '../ui'
+} from '../components/ui'
 
 type Props = {
   state: AppState
