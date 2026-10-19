@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { AppState, Payment } from '../types'
 import { formatCNY } from '../../shared/money'
 import { EmptyState } from '../ui'
+import { Pagination } from '../Pagination'
 
 type Props = {
   state: AppState
@@ -9,11 +10,10 @@ type Props = {
   onDelete: (payment: Payment) => void
 }
 
-const PAGE_SIZE = 8
-
 export function Payments({ state, onAdd, onDelete }: Props) {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const keyword = query.trim().toLowerCase()
 
   const list = useMemo(
@@ -29,9 +29,9 @@ export function Payments({ state, onAdd, onDelete }: Props) {
 
   const total = list.reduce((sum, payment) => sum + payment.amount, 0)
   const average = list.length > 0 ? Math.round(total / list.length) : 0
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(list.length / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const pageItems = list.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const pageItems = list.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const changeQuery = (value: string) => {
     setQuery(value)
@@ -132,27 +132,13 @@ export function Payments({ state, onAdd, onDelete }: Props) {
               </div>
             ))}
           </div>
-          {totalPages > 1 ? (
-            <div className="pager">
-              <button
-                className="btn sm"
-                onClick={() => setPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-              >
-                上一页
-              </button>
-              <span className="pager-info">
-                第 {currentPage} / {totalPages} 页 · 共 {list.length} 笔
-              </span>
-              <button
-                className="btn sm"
-                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-              >
-                下一页
-              </button>
-            </div>
-          ) : null}
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            total={list.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </>
       )}
 
