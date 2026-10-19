@@ -549,6 +549,60 @@ apiRouter.delete(
 )
 
 apiRouter.post(
+  '/joint-quotes',
+  route((req, res) => {
+    const body = req.body ?? {}
+    const capturedAt = date(body.capturedAt, '记录日期')
+    const total = integer(body.total, '整条报价', 0, 1_000_000_000_000)
+    const cycleMonths = cycle(body.cycleMonths)
+    const platform = text(body.platform, '平台', 60)
+    const note = optionalText(body.note, 300)
+
+    if (!Array.isArray(body.subscriptionIds)) {
+      throw new HttpError(400, '参与会员格式不正确')
+    }
+    const rawIds = body.subscriptionIds as unknown[]
+    const subscriptionIds = [
+      ...new Set(rawIds.map((value) => integer(value, '参与会员', 1))),
+    ]
+    if (subscriptionIds.length < 2) {
+      throw new HttpError(400, '联合报价至少需要两个会员')
+    }
+
+    const exists = db.prepare('SELECT id FROM subscriptions WHERE id = ?')
+    for (const id of subscriptionIds) {
+      if (!exists.get(id)) throw new HttpError(404, '会员记录不存在')
+    }
+
+    db.transaction(() => {
+      const info = db
+        .prepare(
+          `INSERT INTO joint_quotes (captured_at, total, cycle_months, platform, note, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run(capturedAt, total, cycleMonths, platform, note, nowISO())
+      const quoteId = Number(info.lastInsertRowid)
+      const insertItem = db.prepare(
+        'INSERT INTO joint_quote_items (joint_quote_id, subscription_id) VALUES (?, ?)',
+      )
+      for (const id of subscriptionIds) insertItem.run(quoteId, id)
+    })()
+
+    res.status(201).json(buildState())
+  }),
+)
+
+apiRouter.delete(
+  '/joint-quotes/:id',
+  route((req, res) => {
+    const id = idParam(req.params.id, '联合报价')
+    const info = db.prepare('DELETE FROM joint_quotes WHERE id = ?').run(id)
+    if (info.changes === 0) throw new HttpError(404, '联合报价不存在')
+    res.json(buildState())
+  }),
+)
+
+apiRouter.post(
   '/seed',
   route((_req, res) => {
     seedDemoData()
@@ -563,14 +617,18 @@ apiRouter.delete(
       throw new HttpError(400, '需要确认参数')
     }
     db.transaction(() => {
+      db.prepare('DELETE FROM joint_quote_items').run()
+      db.prepare('DELETE FROM joint_quotes').run()
       db.prepare('DELETE FROM price_snapshots').run()
       db.prepare('DELETE FROM payments').run()
+      db.prepare('DELETE FROM joint_renewals').run()
       db.prepare('DELETE FROM subscriptions').run()
       db.prepare('DELETE FROM plans').run()
       db.prepare('DELETE FROM services').run()
       db.prepare(
         `DELETE FROM sqlite_sequence WHERE name IN
-          ('price_snapshots', 'payments', 'subscriptions', 'plans', 'services')`,
+          ('joint_quote_items', 'joint_quotes', 'price_snapshots', 'payments',
+           'joint_renewals', 'subscriptions', 'plans', 'services')`,
       ).run()
     })()
     res.json(buildState())

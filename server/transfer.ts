@@ -7,6 +7,7 @@ export type ImportSummary = {
   plansAdded: number
   subscriptionsAdded: number
   jointRenewalsAdded: number
+  jointQuotesAdded: number
   paymentsAdded: number
   snapshotsAdded: number
 }
@@ -77,6 +78,22 @@ function normalizeCycle(value: unknown): number {
 }
 
 export function exportAll() {
+  const jointQuoteRows = db
+    .prepare(
+      `SELECT id, captured_at, total, cycle_months, platform, note, created_at
+       FROM joint_quotes ORDER BY id`,
+    )
+    .all() as { id: number }[]
+  const jointQuoteItemRows = db
+    .prepare('SELECT joint_quote_id, subscription_id FROM joint_quote_items ORDER BY id')
+    .all() as { joint_quote_id: number; subscription_id: number }[]
+  const jointQuoteItemsByQuote = new Map<number, number[]>()
+  for (const item of jointQuoteItemRows) {
+    const list = jointQuoteItemsByQuote.get(item.joint_quote_id) ?? []
+    list.push(item.subscription_id)
+    jointQuoteItemsByQuote.set(item.joint_quote_id, list)
+  }
+
   return {
     app: 'subledger',
     version: 1,
@@ -115,6 +132,12 @@ export function exportAll() {
          FROM price_snapshots ORDER BY id`,
       )
       .all(),
+    jointQuotes: jointQuoteRows.map((quote) => ({
+      ...quote,
+      items: (jointQuoteItemsByQuote.get(quote.id) ?? []).map((subscriptionId) => ({
+        subscription_id: subscriptionId,
+      })),
+    })),
   }
 }
 
@@ -137,12 +160,17 @@ export function importAll(payload: unknown): ImportSummary {
   )
   const payments = asArray(root.payments, '支付列表')
   const snapshots = asArray(root.snapshots, '比价列表')
+  const jointQuotes = asArray(
+    root.jointQuotes ?? root.joint_quotes,
+    '联合报价列表',
+  )
 
   const summary: ImportSummary = {
     servicesAdded: 0,
     plansAdded: 0,
     subscriptionsAdded: 0,
     jointRenewalsAdded: 0,
+    jointQuotesAdded: 0,
     paymentsAdded: 0,
     snapshotsAdded: 0,
   }
@@ -183,6 +211,13 @@ export function importAll(payload: unknown): ImportSummary {
     const insertSnapshot = db.prepare(
       `INSERT INTO price_snapshots (plan_id, captured_at, price, cycle_months, platform, note, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    const insertJointQuote = db.prepare(
+      `INSERT INTO joint_quotes (captured_at, total, cycle_months, platform, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    const insertJointQuoteItem = db.prepare(
+      'INSERT INTO joint_quote_items (joint_quote_id, subscription_id) VALUES (?, ?)',
     )
 
     for (const row of services) {
@@ -276,6 +311,34 @@ export function importAll(payload: unknown): ImportSummary {
       )
       jointRenewalMap.set(oldId, Number(info.lastInsertRowid))
       summary.jointRenewalsAdded += 1
+    }
+
+    for (const row of jointQuotes) {
+      const rawItems = Array.isArray(row.items)
+        ? (row.items as Record<string, unknown>[])
+        : []
+      const subscriptionIds = new Set<number>()
+      for (const item of rawItems) {
+        const subscriptionId = subscriptionMap.get(
+          integer(item.subscription_id, '联合报价会员', 1),
+        )
+        if (subscriptionId) subscriptionIds.add(subscriptionId)
+      }
+      if (subscriptionIds.size === 0) continue
+
+      const info = insertJointQuote.run(
+        date(row.captured_at, '联合报价日期'),
+        integer(row.total, '联合报价总额', 0),
+        normalizeCycle(row.cycle_months ?? 0),
+        optionalText(row.platform, 60),
+        optionalText(row.note),
+        createdStamp(row.created_at),
+      )
+      const quoteId = Number(info.lastInsertRowid)
+      for (const subscriptionId of subscriptionIds) {
+        insertJointQuoteItem.run(quoteId, subscriptionId)
+      }
+      summary.jointQuotesAdded += 1
     }
 
     for (const row of payments) {
