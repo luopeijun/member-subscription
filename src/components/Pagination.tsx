@@ -28,7 +28,9 @@ export function Pagination({
   return (
     <div className="pager">
       <div className="pager-left">
-        <span className="pager-info">共 {total} 条</span>
+        <span className="pager-info">
+          共 <strong>{total}</strong> 条
+        </span>
         <label className="pager-size">
           每页
           <select
@@ -45,28 +47,28 @@ export function Pagination({
         </label>
       </div>
       <div className="pager-right">
-        <button className="btn sm" onClick={() => onPageChange(1)} disabled={current === 1}>
+        <button className="pager-btn" onClick={() => onPageChange(1)} disabled={current === 1}>
           首页
         </button>
         <button
-          className="btn sm"
+          className="pager-btn"
           onClick={() => onPageChange(current - 1)}
           disabled={current === 1}
         >
           上一页
         </button>
-        <span className="pager-info">
-          第 {current} / {totalPages} 页
+        <span className="pager-current">
+          第 <strong>{current}</strong> / {totalPages} 页
         </span>
         <button
-          className="btn sm"
+          className="pager-btn"
           onClick={() => onPageChange(current + 1)}
           disabled={current === totalPages}
         >
           下一页
         </button>
         <button
-          className="btn sm"
+          className="pager-btn"
           onClick={() => onPageChange(totalPages)}
           disabled={current === totalPages}
         >
