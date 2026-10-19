@@ -9,6 +9,7 @@ import {
   STATUS_OPTIONS,
 } from './ui'
 import { formatCNY, toMajor, toMinor } from '../../shared/money'
+import { DAYS_PER_MONTH, DURATION_PRESETS } from '../../shared/duration'
 
 type SavedHandler = (next: AppState, message: string) => void
 
@@ -811,51 +812,78 @@ type JointQuoteFormProps = {
   onSaved: SavedHandler
 }
 
+type QuoteItemDraft = {
+  id: number
+  days: number
+}
+
+function clampDays(value: string): number {
+  const parsed = Math.floor(Number(value))
+  if (!Number.isFinite(parsed)) return 1
+  return Math.min(3650, Math.max(1, parsed))
+}
+
 function monthlyEquivalent(sub: Subscription): number | null {
-  if (sub.cycleMonths <= 0 || !sub.lastPayment) return null
-  return Math.round(sub.lastPayment.amount / sub.cycleMonths)
+  if (!sub.lastPayment || sub.annualized <= 0) return null
+  return Math.round(sub.annualized / 12)
 }
 
 export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps) {
-  const [memberIds, setMemberIds] = useState<number[]>([])
+  const [items, setItems] = useState<QuoteItemDraft[]>([])
   const [picker, setPicker] = useState('')
   const [platform, setPlatform] = useState('')
   const [total, setTotal] = useState('')
-  const [cycleMonths, setCycleMonths] = useState(12)
+  const [defaultDays, setDefaultDays] = useState(360)
   const [capturedAt, setCapturedAt] = useState(state.today)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const selected = memberIds
-    .map((id) => state.subscriptions.find((sub) => sub.id === id))
-    .filter((sub): sub is Subscription => Boolean(sub))
+  const selected = items
+    .map((draft) => {
+      const sub = state.subscriptions.find((item) => item.id === draft.id)
+      return sub ? { ...draft, sub } : null
+    })
+    .filter((item): item is QuoteItemDraft & { sub: Subscription } => Boolean(item))
 
   const options = [...state.subscriptions]
-    .filter((sub) => !memberIds.includes(sub.id))
+    .filter((sub) => !items.some((item) => item.id === sub.id))
     .sort((a, b) => a.serviceName.localeCompare(b.serviceName, 'zh-CN'))
 
   const totalFen =
     total === '' || !Number.isFinite(Number(total)) ? 0 : toMinor(Number(total))
-  const quoteMonthly =
-    cycleMonths > 0 && total !== '' ? Math.round(totalFen / cycleMonths) : null
-  const currentMonthly = selected.reduce(
-    (sum, sub) => sum + (monthlyEquivalent(sub) ?? 0),
-    0,
-  )
-  const excluded = selected.filter((sub) => monthlyEquivalent(sub) === null).length
-  const diff = quoteMonthly !== null ? quoteMonthly - currentMonthly : null
+  const entries = selected.map((item) => {
+    const monthly = monthlyEquivalent(item.sub)
+    const currentCost =
+      monthly !== null && item.days > 0
+        ? Math.round((monthly * item.days) / DAYS_PER_MONTH)
+        : null
+    return { ...item, monthly, currentCost }
+  })
+  const currentTotal = entries.reduce((sum, entry) => sum + (entry.currentCost ?? 0), 0)
+  const excluded = entries.filter((entry) => entry.currentCost === null).length
+  const diff = selected.length > 0 ? totalFen - currentTotal : null
 
   const addMember = () => {
     const id = Number(picker)
     if (!id) return
-    setMemberIds((current) => [...current, id])
+    setItems((current) => [...current, { id, days: defaultDays }])
     setPicker('')
     setError(null)
   }
 
   const removeMember = (id: number) => {
-    setMemberIds((current) => current.filter((item) => item !== id))
+    setItems((current) => current.filter((item) => item.id !== id))
+  }
+
+  const updateItem = (id: number, days: number) => {
+    setItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, days } : item)),
+    )
+  }
+
+  const applyDefault = () => {
+    setItems((current) => current.map((item) => ({ ...item, days: defaultDays })))
   }
 
   const submit = async (event: FormEvent) => {
@@ -870,7 +898,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
       return
     }
     if (total === '' || !Number.isFinite(Number(total)) || Number(total) < 0) {
-      setError('请填写整条报价金额')
+      setError('请填写捆绑包总价')
       return
     }
 
@@ -881,10 +909,12 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
         body: JSON.stringify({
           capturedAt,
           total: totalFen,
-          cycleMonths,
           platform: platform.trim(),
           note: note.trim() || null,
-          subscriptionIds: memberIds,
+          items: selected.map((item) => ({
+            subscriptionId: item.id,
+            durationDays: item.days,
+          })),
         }),
       })
       onSaved(next, '联合报价已记录')
@@ -898,7 +928,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
   return (
     <Modal
       title="记录联合报价"
-      subtitle="把整条捆绑装的价格和当前组合的月均成本对比"
+      subtitle="一次买多个会员的总价，和同样时长下当前组合要花的钱对比"
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -926,7 +956,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
             </button>
           </div>
           <p className="joint-hint">
-            选择你现在持有的会员，用来计算「当前组合」的月均成本。
+            选择你现在持有的会员，再填每个会员这条报价能拿到多少天，用来算当前组合要花多少钱。
           </p>
         </div>
 
@@ -936,32 +966,42 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
             <p className="joint-hint">还没有添加会员。至少添加两个才能记录联合报价。</p>
           ) : (
             <div className="joint-members">
-              {selected.map((sub) => {
-                const monthly = monthlyEquivalent(sub)
-                return (
-                  <div key={sub.id} className="joint-member picked">
-                    <div className="joint-member-main">
-                      <strong>{sub.serviceName}</strong>
-                      <span>
-                        {sub.planName}
-                        {sub.lastPayment
-                          ? ` · 最近 ${formatCNY(sub.lastPayment.amount)}`
-                          : ' · 未记录支付'}
-                      </span>
-                    </div>
-                    <span className="joint-member-cost">
-                      {monthly === null ? '一次性' : `${formatCNY(monthly)}/月`}
+              {entries.map((entry) => (
+                <div key={entry.id} className="joint-member picked">
+                  <div className="joint-member-main">
+                    <strong>{entry.sub.serviceName}</strong>
+                    <span>
+                      {entry.sub.planName}
+                      {entry.monthly === null
+                        ? ' · 没有可比月均成本'
+                        : ` · 当前 ${formatCNY(entry.monthly)}/月`}
                     </span>
-                    <button
-                      type="button"
-                      className="btn sm"
-                      onClick={() => removeMember(sub.id)}
-                    >
-                      移除
-                    </button>
                   </div>
-                )
-              })}
+                  <div className="joint-member-duration">
+                    <input
+                      type="number"
+                      min={1}
+                      max={3650}
+                      value={entry.days}
+                      aria-label={`${entry.sub.serviceName} 时长（天）`}
+                      onChange={(event) =>
+                        updateItem(entry.id, clampDays(event.target.value))
+                      }
+                    />
+                    <span>天</span>
+                  </div>
+                  <span className="joint-member-cost">
+                    {entry.currentCost === null ? '—' : formatCNY(entry.currentCost)}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={() => removeMember(entry.id)}
+                  >
+                    移除
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -982,7 +1022,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
             </datalist>
           </div>
           <div className="field">
-            <label>整条报价（元）*</label>
+            <label>捆绑包总价（元）*</label>
             <input
               type="number"
               min="0"
@@ -992,18 +1032,39 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
               onChange={(event) => setTotal(event.target.value)}
             />
           </div>
-          <div className="field">
-            <label>计费周期</label>
-            <select
-              value={cycleMonths}
-              onChange={(event) => setCycleMonths(Number(event.target.value))}
-            >
-              {CYCLE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
+          <div className="field span-2">
+            <label>默认天数</label>
+            <div className="duration-input">
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                value={defaultDays}
+                aria-label="默认天数"
+                onChange={(event) => setDefaultDays(clampDays(event.target.value))}
+              />
+              <span>天</span>
+              <button
+                type="button"
+                className="btn sm"
+                onClick={applyDefault}
+                disabled={selected.length === 0}
+              >
+                应用到全部
+              </button>
+            </div>
+            <div className="duration-presets">
+              {DURATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.days}
+                  type="button"
+                  className={`btn sm${defaultDays === preset.days ? ' active' : ''}`}
+                  onClick={() => setDefaultDays(preset.days)}
+                >
+                  {preset.label}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
           <div className="field">
             <label>看到价格的日期</label>
@@ -1013,7 +1074,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
               onChange={(event) => setCapturedAt(event.target.value)}
             />
           </div>
-          <div className="field span-2">
+          <div className="field">
             <label>怎么买 / 备注</label>
             <input
               value={note}
@@ -1025,27 +1086,21 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
 
         <div className="quote-preview">
           <div className="quote-preview-row">
-            <span>当前组合</span>
-            <strong>
-              {selected.length === 0 ? '—' : `${formatCNY(currentMonthly)}/月`}
-            </strong>
+            <span>当前组合总价</span>
+            <strong>{selected.length === 0 ? '—' : formatCNY(currentTotal)}</strong>
           </div>
           <div className="quote-preview-row">
-            <span>整条报价</span>
-            <strong>
-              {quoteMonthly === null
-                ? '—'
-                : `${formatCNY(quoteMonthly)}/月`}
-            </strong>
+            <span>捆绑包总价</span>
+            <strong>{formatCNY(totalFen)}</strong>
           </div>
           <div className="quote-preview-row">
             <span>差额</span>
             {diff === null ? (
               <span className="muted">—</span>
             ) : diff < 0 ? (
-              <span className="badge ok">省 {formatCNY(-diff)}/月</span>
+              <span className="badge ok">省 {formatCNY(-diff)}</span>
             ) : diff > 0 ? (
-              <span className="badge warn">贵 {formatCNY(diff)}/月</span>
+              <span className="badge warn">贵 {formatCNY(diff)}</span>
             ) : (
               <span className="badge muted">持平</span>
             )}
@@ -1054,7 +1109,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
 
         {excluded > 0 ? (
           <p className="joint-hint">
-            有 {excluded} 个会员是一次性购买，未计入月均成本。
+            有 {excluded} 个会员没有可比的月均成本，未计入对比。
           </p>
         ) : null}
 

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { AppState, JointRenewal, Payment } from '../types'
 import { formatCNY } from '../../shared/money'
-import { EmptyState, formatDate, cycleLabel } from '../components/ui'
+import { formatDuration } from '../../shared/duration'
+import { EmptyState, formatDate } from '../components/ui'
 import { Pagination } from '../components/Pagination'
 
 type Props = {
@@ -150,9 +151,7 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Props
                         <strong>
                           {formatDate(renewal.paidAt)} · {renewal.members.length} 个会员
                         </strong>
-                        <span>
-                          {formatCNY(renewal.total)} · {cycleLabel(renewal.cycleMonths)}
-                        </span>
+                        <span>合计 {formatCNY(renewal.total)}</span>
                       </div>
                       <span className="badge joint">
                         {renewal.costMode === 'split' ? '均分' : '主会员承担'}
@@ -162,7 +161,10 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Props
                       {renewal.members.map((member) => (
                         <span className="joint-renewal-member" key={member.subscriptionId}>
                           {member.serviceName}
-                          <em>{formatCNY(member.amount)}</em>
+                          <em>
+                            {formatDuration(member.durationDays)} ·{' '}
+                            {formatCNY(member.amount)}
+                          </em>
                         </span>
                       ))}
                     </div>

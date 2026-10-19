@@ -1878,6 +1878,49 @@ code {
   white-space: nowrap;
 }
 
+.joint-member-duration,
+.duration-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.joint-member-duration input,
+.duration-input input {
+  width: 52px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.joint-member-duration input:focus,
+.duration-input input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.duration-input .btn {
+  margin-left: 4px;
+}
+
+.duration-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .joint-summary {
   padding: 2px 0 0;
   color: var(--muted);

@@ -2,18 +2,23 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { api } from '../api'
 import type { AppState, JointCostMode, Subscription } from '../types'
 import { formatCNY, toMinor } from '../../shared/money'
-import { CYCLE_OPTIONS, Modal, formatDate } from './ui'
+import { DURATION_PRESETS, formatDuration } from '../../shared/duration'
+import { Modal, formatDate } from './ui'
 
-function addMonths(value: string, months: number): string {
+function addDays(value: string, days: number): string {
   const [year, month, day] = value.split('-').map(Number)
-  const targetIndex = month - 1 + months
-  const targetYear = year + Math.floor(targetIndex / 12)
-  const targetMonth = ((targetIndex % 12) + 12) % 12
-  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate()
-  const targetDay = Math.min(day, lastDay)
-  return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(
-    targetDay,
-  ).padStart(2, '0')}`
+  const base = new Date(Date.UTC(year, month - 1, day))
+  base.setUTCDate(base.getUTCDate() + days)
+  return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(
+    2,
+    '0',
+  )}-${String(base.getUTCDate()).padStart(2, '0')}`
+}
+
+function clampDays(value: string): number {
+  const parsed = Math.floor(Number(value))
+  if (!Number.isFinite(parsed)) return 1
+  return Math.min(3650, Math.max(1, parsed))
 }
 
 type Props = {
@@ -22,13 +27,18 @@ type Props = {
   onSaved: (next: AppState, message: string) => void
 }
 
+type MemberDraft = {
+  id: number
+  days: number
+}
+
 export function JointRenewForm({ state, onClose, onSaved }: Props) {
-  const [memberIds, setMemberIds] = useState<number[]>([])
+  const [members, setMembers] = useState<MemberDraft[]>([])
   const [mainId, setMainId] = useState<number | null>(null)
   const [picker, setPicker] = useState('')
   const [total, setTotal] = useState('')
   const [paidAt, setPaidAt] = useState(state.today)
-  const [cycleMonths, setCycleMonths] = useState(12)
+  const [defaultDays, setDefaultDays] = useState(360)
   const [costMode, setCostMode] = useState<JointCostMode>('split')
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
@@ -36,41 +46,65 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
 
   const selectedMembers = useMemo(
     () =>
-      memberIds
-        .map((id) => state.subscriptions.find((sub) => sub.id === id))
-        .filter((sub): sub is Subscription => Boolean(sub)),
-    [memberIds, state.subscriptions],
+      members
+        .map((draft) => {
+          const sub = state.subscriptions.find((item) => item.id === draft.id)
+          return sub ? { ...draft, sub } : null
+        })
+        .filter((item): item is MemberDraft & { sub: Subscription } => Boolean(item)),
+    [members, state.subscriptions],
   )
 
   const options = useMemo(
     () =>
       [...state.subscriptions]
-        .filter((sub) => !memberIds.includes(sub.id))
+        .filter((sub) => !members.some((member) => member.id === sub.id))
         .sort((a, b) => a.serviceName.localeCompare(b.serviceName, 'zh-CN')),
-    [state.subscriptions, memberIds],
+    [state.subscriptions, members],
   )
 
   const totalFen =
     total === '' || !Number.isFinite(Number(total)) ? 0 : toMinor(Number(total))
-  const share =
-    selectedMembers.length > 0 ? Math.floor(totalFen / selectedMembers.length) : 0
-  const remainder =
-    selectedMembers.length > 0 ? totalFen - share * selectedMembers.length : 0
-  const mainMember = selectedMembers.find((sub) => sub.id === mainId) ?? null
+  const totalDays = selectedMembers.reduce((sum, member) => sum + member.days, 0)
+  const amounts = selectedMembers.map((member) => {
+    if (costMode === 'main') return member.id === mainId ? totalFen : 0
+    if (totalDays <= 0) return 0
+    return Math.floor((totalFen * member.days) / totalDays)
+  })
+  if (costMode === 'split' && totalDays > 0) {
+    const mainIndex = selectedMembers.findIndex((member) => member.id === mainId)
+    if (mainIndex >= 0) {
+      const assigned = amounts.reduce((sum, amount) => sum + amount, 0)
+      amounts[mainIndex] += totalFen - assigned
+    }
+  }
+  const mainMember = selectedMembers.find((member) => member.id === mainId) ?? null
 
   const addMember = () => {
     const id = Number(picker)
     if (!id) return
-    setMemberIds((current) => [...current, id])
+    setMembers((current) => [...current, { id, days: defaultDays }])
     if (mainId === null) setMainId(id)
     setPicker('')
     setError('')
   }
 
   const removeMember = (id: number) => {
-    const next = memberIds.filter((item) => item !== id)
-    setMemberIds(next)
-    if (mainId === id) setMainId(next[0] ?? null)
+    const next = members.filter((member) => member.id !== id)
+    setMembers(next)
+    if (mainId === id) setMainId(next[0]?.id ?? null)
+  }
+
+  const updateMember = (id: number, days: number) => {
+    setMembers((current) =>
+      current.map((member) => (member.id === id ? { ...member, days } : member)),
+    )
+  }
+
+  const applyDefault = () => {
+    setMembers((current) =>
+      current.map((member) => ({ ...member, days: defaultDays })),
+    )
   }
 
   const submit = async (event: FormEvent) => {
@@ -87,21 +121,19 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
       setError('请填写本次购买总金额')
       return
     }
-    if (cycleMonths === 0) {
-      setError('联合续费周期必须大于 0')
-      return
-    }
 
     setBusy(true)
     try {
       const next = await api<AppState>('/joint-renewals', {
         method: 'POST',
         body: JSON.stringify({
-          memberIds,
+          members: selectedMembers.map((member) => ({
+            subscriptionId: member.id,
+            durationDays: member.days,
+          })),
           mainSubscriptionId: mainId,
           total: totalFen,
           paidAt,
-          cycleMonths,
           costMode,
           note,
         }),
@@ -117,7 +149,7 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
   return (
     <Modal
       title="联合续费"
-      subtitle="一次购买，多个会员一起顺延；会员本身仍然独立"
+      subtitle="一次购买，多个会员一起顺延；每个会员可以拿不同的天数"
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -145,7 +177,7 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
             </button>
           </div>
           <p className="joint-hint">
-            所有会员都可以自由组合。这次一起买，不代表以后必须一起续。
+            所有会员都可以自由组合。这次一起买，不代表以后必须一起续；每个会员拿到的天数可以不同。
           </p>
         </div>
 
@@ -155,34 +187,42 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
             <p className="joint-hint">还没有添加会员。至少添加两个才能记录联合续费。</p>
           ) : (
             <div className="joint-members">
-              {selectedMembers.map((sub) => {
-                const isMain = sub.id === mainId
-                const amount =
-                  costMode === 'main'
-                    ? isMain
-                      ? totalFen
-                      : 0
-                    : share + (isMain ? remainder : 0)
-                const nextDate = sub.nextRenewalAt
-                  ? addMonths(sub.nextRenewalAt, cycleMonths)
-                  : addMonths(paidAt, cycleMonths)
+              {selectedMembers.map((member, index) => {
+                const isMain = member.id === mainId
+                const nextDate = addDays(
+                  member.sub.nextRenewalAt ?? paidAt,
+                  member.days,
+                )
                 return (
-                  <div key={sub.id} className="joint-member picked">
+                  <div key={member.id} className="joint-member picked">
                     <div className="joint-member-main">
                       <strong>
-                        {sub.serviceName}
+                        {member.sub.serviceName}
                         {isMain ? ' · 主会员' : ''}
                       </strong>
                       <span>
-                        {sub.planName} · 到期 {formatDate(sub.nextRenewalAt)} →{' '}
-                        {formatDate(nextDate)}
+                        {member.sub.planName} · 到期{' '}
+                        {formatDate(member.sub.nextRenewalAt)} → {formatDate(nextDate)}
                       </span>
                     </div>
-                    <span className="joint-member-cost">{formatCNY(amount)}</span>
+                    <div className="joint-member-duration">
+                      <input
+                        type="number"
+                        min={1}
+                        max={3650}
+                        value={member.days}
+                        aria-label={`${member.sub.serviceName} 时长（天）`}
+                        onChange={(event) =>
+                          updateMember(member.id, clampDays(event.target.value))
+                        }
+                      />
+                      <span>天</span>
+                    </div>
+                    <span className="joint-member-cost">{formatCNY(amounts[index])}</span>
                     <button
                       type="button"
                       className="btn sm"
-                      onClick={() => removeMember(sub.id)}
+                      onClick={() => removeMember(member.id)}
                     >
                       移除
                     </button>
@@ -213,18 +253,39 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
               onChange={(event) => setPaidAt(event.target.value)}
             />
           </div>
-          <div className="field">
-            <label>续费周期</label>
-            <select
-              value={cycleMonths}
-              onChange={(event) => setCycleMonths(Number(event.target.value))}
-            >
-              {CYCLE_OPTIONS.filter((option) => option.value > 0).map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+          <div className="field span-2">
+            <label>默认天数</label>
+            <div className="duration-input">
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                value={defaultDays}
+                aria-label="默认天数"
+                onChange={(event) => setDefaultDays(clampDays(event.target.value))}
+              />
+              <span>天</span>
+              <button
+                type="button"
+                className="btn sm"
+                onClick={applyDefault}
+                disabled={selectedMembers.length === 0}
+              >
+                应用到全部
+              </button>
+            </div>
+            <div className="duration-presets">
+              {DURATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.days}
+                  type="button"
+                  className={`btn sm${defaultDays === preset.days ? ' active' : ''}`}
+                  onClick={() => setDefaultDays(preset.days)}
+                >
+                  {preset.label}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
           <div className="field">
             <label>费用归属</label>
@@ -232,11 +293,11 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
               value={costMode}
               onChange={(event) => setCostMode(event.target.value as JointCostMode)}
             >
-              <option value="split">均分</option>
+              <option value="split">均分（按天数）</option>
               <option value="main">主会员承担</option>
             </select>
           </div>
-          <div className="field span-2">
+          <div className="field">
             <label>主会员</label>
             <select
               value={mainId ?? ''}
@@ -244,9 +305,9 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
               disabled={selectedMembers.length === 0}
             >
               <option value="">选择费用归属会员</option>
-              {selectedMembers.map((sub) => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.serviceName} · {sub.planName}
+              {selectedMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.sub.serviceName} · {member.sub.planName}
                 </option>
               ))}
             </select>
@@ -262,7 +323,8 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
         </div>
 
         <div className="joint-hint" style={{ marginTop: 10 }}>
-          你仍然是实际付款人；这里的主会员只决定这笔钱记在谁的账上。均分时余数记在主会员，选择「主会员承担」时全部记在主会员。
+          你仍然是实际付款人；这里的主会员只决定这笔钱记在谁的账上。均分时按每个会员实际拿到的天数分摊，
+          余数记在主会员；选择「主会员承担」时全部记在主会员。
         </div>
 
         <div className="joint-summary">
@@ -270,8 +332,8 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
           {selectedMembers.length === 0
             ? ''
             : costMode === 'split'
-              ? ` · 均分，余数记在${mainMember?.serviceName ?? '主会员'}`
-              : ` · 全部记在${mainMember?.serviceName ?? '主会员'}`}
+              ? ` · 按天数分摊，余数记在${mainMember?.sub.serviceName ?? '主会员'}`
+              : ` · 全部记在${mainMember?.sub.serviceName ?? '主会员'}`}
         </div>
 
         {error ? <div className="form-error">{error}</div> : null}

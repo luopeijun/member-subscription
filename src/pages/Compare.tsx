@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react'
 import type {
   AppState,
   JointQuote,
-  JointQuoteItem,
   Plan,
   Snapshot,
   Subscription,
 } from '../types'
 import { formatCNY } from '../../shared/money'
+import { DAYS_PER_MONTH, formatDuration } from '../../shared/duration'
 import {
   EmptyState,
   cycleLabel,
@@ -39,11 +39,6 @@ function latestPerPlatform(snapshots: Snapshot[], planId: number): Snapshot[] {
   return [...map.values()].sort((a, b) => a.price - b.price)
 }
 
-function itemMonthly(item: JointQuoteItem): number | null {
-  if (item.cycleMonths <= 0 || item.amount === null) return null
-  return Math.round(item.amount / item.cycleMonths)
-}
-
 function JointQuoteCard({
   quote,
   onDelete,
@@ -51,12 +46,16 @@ function JointQuoteCard({
   quote: JointQuote
   onDelete: (jointQuote: JointQuote) => void
 }) {
-  const entries = quote.items.map((item) => ({ item, monthly: itemMonthly(item) }))
-  const currentMonthly = entries.reduce((sum, entry) => sum + (entry.monthly ?? 0), 0)
-  const excluded = entries.filter((entry) => entry.monthly === null).length
-  const quoteMonthly =
-    quote.cycleMonths > 0 ? Math.round(quote.total / quote.cycleMonths) : null
-  const diff = quoteMonthly !== null ? quoteMonthly - currentMonthly : null
+  const entries = quote.items.map((item) => {
+    const currentCost =
+      item.monthly !== null && item.durationDays > 0
+        ? Math.round((item.monthly * item.durationDays) / DAYS_PER_MONTH)
+        : null
+    return { item, currentCost }
+  })
+  const currentTotal = entries.reduce((sum, entry) => sum + (entry.currentCost ?? 0), 0)
+  const excluded = entries.filter((entry) => entry.currentCost === null).length
+  const diff = quote.items.length > 0 ? quote.total - currentTotal : null
 
   return (
     <article className="joint-quote-card">
@@ -66,8 +65,7 @@ function JointQuoteCard({
             {quote.platform ?? '未标注'} · {formatDay(quote.capturedAt)}
           </strong>
           <span>
-            {quote.items.length} 个会员 · {cycleLabel(quote.cycleMonths)} · 整条{' '}
-            {formatCNY(quote.total)}
+            {quote.items.length} 个会员 · 总价 {formatCNY(quote.total)}
           </span>
         </div>
         <button className="btn sm danger" onClick={() => onDelete(quote)}>
@@ -79,35 +77,35 @@ function JointQuoteCard({
         {quote.items.length === 0 ? (
           <span className="muted">关联会员已删除</span>
         ) : (
-          quote.items.map((item) => {
-            const monthly = itemMonthly(item)
-            return (
-              <span className="joint-quote-item" key={item.subscriptionId}>
-                {item.serviceName}
-                <em>{monthly === null ? '一次性' : `${formatCNY(monthly)}/月`}</em>
-              </span>
-            )
-          })
+          quote.items.map((item) => (
+            <span className="joint-quote-item" key={item.subscriptionId}>
+              {item.serviceName}
+              <em>
+                {formatDuration(item.durationDays)}
+                {item.monthly === null ? '' : ` · 当前 ${formatCNY(item.monthly)}/月`}
+              </em>
+            </span>
+          ))
         )}
       </div>
 
       <div className="joint-quote-compare">
         <div className="quote-compare-cell">
-          <span>当前组合</span>
-          <strong>{formatCNY(currentMonthly)}/月</strong>
+          <span>当前组合总价</span>
+          <strong>{formatCNY(currentTotal)}</strong>
         </div>
         <div className="quote-compare-cell">
-          <span>整条报价</span>
-          <strong>{quoteMonthly === null ? '—' : `${formatCNY(quoteMonthly)}/月`}</strong>
+          <span>捆绑包总价</span>
+          <strong>{formatCNY(quote.total)}</strong>
         </div>
         <div className="quote-compare-cell">
           <span>差额</span>
           {diff === null ? (
             <span className="muted">—</span>
           ) : diff < 0 ? (
-            <span className="badge ok">省 {formatCNY(-diff)}/月</span>
+            <span className="badge ok">省 {formatCNY(-diff)}</span>
           ) : diff > 0 ? (
-            <span className="badge warn">贵 {formatCNY(diff)}/月</span>
+            <span className="badge warn">贵 {formatCNY(diff)}</span>
           ) : (
             <span className="badge muted">持平</span>
           )}
@@ -116,7 +114,7 @@ function JointQuoteCard({
 
       {excluded > 0 ? (
         <p className="joint-hint">
-          有 {excluded} 个会员是一次性购买，未计入月均成本。
+          有 {excluded} 个会员没有可比的月均成本，未计入对比。
         </p>
       ) : null}
       {quote.note ? <p className="joint-hint">{quote.note}</p> : null}
@@ -351,7 +349,8 @@ export function Compare({
         每个套餐下面，上面一行是<strong>你当前购买的平台和价格</strong>，
         下面是我录入的其他平台报价。差价按<strong>等效月成本</strong>计算（年付 ÷ 12），
         合租、代充、需要额外条件的情况写在「怎么买」里。
-        捆绑装则记成<strong>联合报价</strong>，对比这几个会员当前组合的月均成本。
+        捆绑装则记成<strong>联合报价</strong>，按每个会员各自拿到的天数算出当前组合要花多少钱，
+        再和捆绑包总价对比。
       </p>
 
       {state.jointQuotes.length > 0 ? (
@@ -359,7 +358,7 @@ export function Compare({
           <div className="card-head">
             <div>
               <h2>联合报价</h2>
-              <p>整条捆绑装的价格，对比这几个会员当前组合的月均成本</p>
+              <p>一次买多个会员的总价，对比同样时长下当前组合要花的钱</p>
             </div>
           </div>
           <div className="joint-quote-list">

@@ -29,6 +29,7 @@ export type JointRenewalMember = {
   serviceName: string
   planName: string
   amount: number
+  durationDays: number
 }
 
 export type JointRenewal = {
@@ -96,8 +97,8 @@ export type JointQuoteItem = {
   subscriptionId: number
   serviceName: string
   planName: string
-  cycleMonths: number
-  amount: number | null
+  durationDays: number
+  monthly: number | null
 }
 
 export type JointQuote = {

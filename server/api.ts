@@ -3,7 +3,7 @@ import { db } from './db'
 import { HttpError } from './errors'
 import { buildState } from './store'
 import { seedDemoData } from './seed'
-import { addMonths, isISODate, nowISO, todayISO } from './util'
+import { addDays, addMonths, isISODate, nowISO, todayISO } from './util'
 import { exportAll, importAll } from './transfer'
 
 const STATUSES = new Set(['active', 'expired'])
@@ -190,6 +190,27 @@ function costMode(value: unknown): JointCostMode {
   throw new HttpError(400, '费用归属不正确')
 }
 
+type JointMemberInput = {
+  subscriptionId: number
+  days: number
+}
+
+function parseMembers(value: unknown, label: string): JointMemberInput[] {
+  if (!Array.isArray(value)) {
+    throw new HttpError(400, `${label}格式不正确`)
+  }
+  const seen = new Set<number>()
+  const members: JointMemberInput[] = []
+  for (const raw of value as Record<string, unknown>[]) {
+    const subscriptionId = integer(raw.subscriptionId, label, 1)
+    if (seen.has(subscriptionId)) continue
+    seen.add(subscriptionId)
+    const days = integer(raw.durationDays, `${label}时长（天）`, 1, 3650)
+    members.push({ subscriptionId, days })
+  }
+  return members
+}
+
 export const apiRouter = Router()
 
 apiRouter.get(
@@ -338,31 +359,20 @@ apiRouter.post(
     const body = req.body ?? {}
     const total = integer(body.total, '总金额', 0, 1_000_000_000_000)
     const paidAt = date(body.paidAt, '支付日期')
-    const months = cycle(body.cycleMonths)
-    if (months === 0) {
-      throw new HttpError(400, '联合续费周期必须大于 0')
-    }
     const mode = costMode(body.costMode)
     const note = optionalText(body.note, 300)
 
-    if (!Array.isArray(body.memberIds)) {
-      throw new HttpError(400, '参与会员格式不正确')
-    }
-    const rawMemberIds = body.memberIds as unknown[]
-    const memberIds = [
-      ...new Set(rawMemberIds.map((value) => integer(value, '参与会员', 1))),
-    ]
-    if (memberIds.length < 2) {
+    const members = parseMembers(body.members, '参与会员')
+    if (members.length < 2) {
       throw new HttpError(400, '联合续费至少需要两个会员')
     }
 
     const mainSubscriptionId = integer(body.mainSubscriptionId, '费用归属会员', 1)
-    if (!memberIds.includes(mainSubscriptionId)) {
+    if (!members.some((member) => member.subscriptionId === mainSubscriptionId)) {
       throw new HttpError(400, '费用归属会员必须在参与会员中')
     }
 
-    const share = Math.floor(total / memberIds.length)
-    const remainder = total - share * memberIds.length
+    const totalDays = members.reduce((sum, member) => sum + member.days, 0)
 
     const memberStmt = db.prepare(
       `SELECT s.id, s.started_at, s.next_renewal_override, s.status,
@@ -384,51 +394,76 @@ apiRouter.post(
     )
     const insertPayment = db.prepare(
       `INSERT INTO payments
-        (subscription_id, paid_at, amount, note, joint_renewal_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+        (subscription_id, paid_at, amount, note, joint_renewal_id, duration_days, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     const update = db.prepare(
       'UPDATE subscriptions SET next_renewal_override = ?, status = ? WHERE id = ?',
     )
 
     db.transaction(() => {
-      const prepared = memberIds.map((memberId) => {
-        const member = memberStmt.get(memberId) as JointMemberRow | undefined
-        if (!member) throw new HttpError(404, '会员记录不存在')
-        const last = lastPaymentStmt.get(memberId) as { paid_at: string } | undefined
+      const prepared = members.map((member) => {
+        const row = memberStmt.get(member.subscriptionId) as
+          | JointMemberRow
+          | undefined
+        if (!row) throw new HttpError(404, '会员记录不存在')
+        const last = lastPaymentStmt.get(member.subscriptionId) as
+          | { paid_at: string }
+          | undefined
         const currentNext =
-          member.next_renewal_override ||
-          addMonths(last?.paid_at ?? member.started_at, member.plan_cycle)
-        return { member, nextDate: addMonths(currentNext, months) }
+          row.next_renewal_override ||
+          addMonths(last?.paid_at ?? row.started_at, row.plan_cycle)
+        const nextDate = addDays(currentNext, member.days)
+        return { member, row, nextDate }
       })
 
+      const bundleMonths = Math.max(
+        ...members.map((member) => Math.round(member.days / 30)),
+        0,
+      )
       const jointInfo = insertJoint.run(
         mainSubscriptionId,
         paidAt,
         total,
-        months,
+        bundleMonths,
         mode,
         note,
         nowISO(),
       )
       const jointRenewalId = Number(jointInfo.lastInsertRowid)
 
-      for (const item of prepared) {
-        const isMain = item.member.id === mainSubscriptionId
-        const amount =
-          mode === 'main' ? (isMain ? total : 0) : share + (isMain ? remainder : 0)
+      // 均分时按每个会员实际拿到的时长分摊，余数记在主会员。
+      let assigned = 0
+      const amounts = prepared.map(({ member }) => {
+        if (mode === 'main') {
+          const amount = member.subscriptionId === mainSubscriptionId ? total : 0
+          assigned += amount
+          return amount
+        }
+        const amount = Math.floor((total * member.days) / totalDays)
+        assigned += amount
+        return amount
+      })
+      if (mode === 'split') {
+        const mainIndex = prepared.findIndex(
+          ({ member }) => member.subscriptionId === mainSubscriptionId,
+        )
+        if (mainIndex >= 0) amounts[mainIndex] += total - assigned
+      }
+
+      prepared.forEach(({ member, row, nextDate }, index) => {
         insertPayment.run(
-          item.member.id,
+          member.subscriptionId,
           paidAt,
-          amount,
+          amounts[index],
           note,
           jointRenewalId,
+          member.days,
           nowISO(),
         )
-        const nextStatus =
-          item.nextDate >= todayISO() ? 'active' : item.member.status
-        update.run(item.nextDate, nextStatus, item.member.id)
-      }
+        const nextStatus = nextDate >= todayISO() ? 'active' : row.status
+        update.run(nextDate, nextStatus, member.subscriptionId)
+      })
     })()
 
     res.status(201).json(buildState())
@@ -554,25 +589,25 @@ apiRouter.post(
     const body = req.body ?? {}
     const capturedAt = date(body.capturedAt, '记录日期')
     const total = integer(body.total, '整条报价', 0, 1_000_000_000_000)
-    const cycleMonths = cycle(body.cycleMonths)
     const platform = text(body.platform, '平台', 60)
     const note = optionalText(body.note, 300)
 
-    if (!Array.isArray(body.subscriptionIds)) {
-      throw new HttpError(400, '参与会员格式不正确')
-    }
-    const rawIds = body.subscriptionIds as unknown[]
-    const subscriptionIds = [
-      ...new Set(rawIds.map((value) => integer(value, '参与会员', 1))),
-    ]
-    if (subscriptionIds.length < 2) {
+    const items = parseMembers(body.items, '报价会员')
+    if (items.length < 2) {
       throw new HttpError(400, '联合报价至少需要两个会员')
     }
 
     const exists = db.prepare('SELECT id FROM subscriptions WHERE id = ?')
-    for (const id of subscriptionIds) {
-      if (!exists.get(id)) throw new HttpError(404, '会员记录不存在')
+    for (const item of items) {
+      if (!exists.get(item.subscriptionId)) {
+        throw new HttpError(404, '会员记录不存在')
+      }
     }
+
+    const bundleMonths = Math.max(
+      ...items.map((item) => Math.round(item.days / 30)),
+      0,
+    )
 
     db.transaction(() => {
       const info = db
@@ -580,12 +615,16 @@ apiRouter.post(
           `INSERT INTO joint_quotes (captured_at, total, cycle_months, platform, note, created_at)
            VALUES (?, ?, ?, ?, ?, ?)`,
         )
-        .run(capturedAt, total, cycleMonths, platform, note, nowISO())
+        .run(capturedAt, total, bundleMonths, platform, note, nowISO())
       const quoteId = Number(info.lastInsertRowid)
       const insertItem = db.prepare(
-        'INSERT INTO joint_quote_items (joint_quote_id, subscription_id) VALUES (?, ?)',
+        `INSERT INTO joint_quote_items
+          (joint_quote_id, subscription_id, duration_days)
+         VALUES (?, ?, ?)`,
       )
-      for (const id of subscriptionIds) insertItem.run(quoteId, id)
+      for (const item of items) {
+        insertItem.run(quoteId, item.subscriptionId, item.days)
+      }
     })()
 
     res.status(201).json(buildState())
