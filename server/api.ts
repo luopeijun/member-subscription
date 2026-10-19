@@ -3,7 +3,7 @@ import { db } from './db'
 import { HttpError } from './errors'
 import { buildState } from './store'
 import { seedDemoData } from './seed'
-import { isISODate, nowISO, todayISO } from './util'
+import { addMonths, isISODate, nowISO, todayISO } from './util'
 import { exportAll, importAll } from './transfer'
 
 const STATUSES = new Set(['active', 'expired'])
@@ -163,8 +163,6 @@ function getSubscription(id: number) {
         status: string
         shared_with: string | null
         note: string | null
-        joint_parent_id: number | null
-        joint_cost_mode: string
       }
     | undefined
   if (!sub) throw new HttpError(404, '会员记录不存在')
@@ -190,77 +188,6 @@ type JointCostMode = 'split' | 'main'
 function costMode(value: unknown): JointCostMode {
   if (value === 'split' || value === 'main') return value
   throw new HttpError(400, '费用归属不正确')
-}
-
-type JointPaymentRow = {
-  id: number
-  subscription_id: number
-  paid_at: string
-  amount: number
-  joint_purchase_id: string | null
-}
-
-function reallocateLatestJointPurchase(
-  mainId: number,
-  childIds: number[],
-  mode: JointCostMode,
-) {
-  const ids = [mainId, ...childIds]
-  const placeholders = ids.map(() => '?').join(', ')
-  const rows = db
-    .prepare(
-      `SELECT id, subscription_id, paid_at, amount, joint_purchase_id
-       FROM payments
-       WHERE subscription_id IN (${placeholders})
-       ORDER BY paid_at DESC, id DESC`,
-    )
-    .all(...ids) as JointPaymentRow[]
-
-  if (rows.length === 0) return
-
-  const mainPayments = rows.filter((row) => row.subscription_id === mainId)
-  if (mainPayments.length === 0) return
-
-  const latestJoint = mainPayments.find((row) => row.joint_purchase_id)
-  const group = latestJoint?.joint_purchase_id
-    ? rows.filter((row) => row.joint_purchase_id === latestJoint.joint_purchase_id)
-    : rows.filter((row) => row.paid_at === mainPayments[0].paid_at)
-
-  const bySubscription = new Map<number, JointPaymentRow>()
-  for (const row of group) {
-    if (!bySubscription.has(row.subscription_id)) {
-      bySubscription.set(row.subscription_id, row)
-    }
-  }
-
-  const participants = ids.filter((id) => bySubscription.has(id))
-  if (participants.length === 0) return
-
-  const total = participants.reduce(
-    (sum, id) => sum + (bySubscription.get(id)?.amount ?? 0),
-    0,
-  )
-  if (total <= 0) return
-
-  const update = db.prepare('UPDATE payments SET amount = ? WHERE id = ?')
-
-  if (mode === 'main') {
-    const mainPayment = bySubscription.get(mainId)
-    if (!mainPayment) return
-    update.run(total, mainPayment.id)
-    for (const id of participants) {
-      if (id === mainId) continue
-      update.run(0, bySubscription.get(id)!.id)
-    }
-    return
-  }
-
-  const base = Math.floor(total / participants.length)
-  const remainder = total - base * participants.length
-  const remainderTarget = bySubscription.has(mainId) ? mainId : participants[0]
-  for (const id of participants) {
-    update.run(base + (id === remainderTarget ? remainder : 0), bySubscription.get(id)!.id)
-  }
 }
 
 export const apiRouter = Router()
@@ -397,53 +324,123 @@ apiRouter.delete(
   }),
 )
 
-apiRouter.put(
-  '/subscriptions/:id/joint',
+type JointMemberRow = {
+  id: number
+  started_at: string
+  next_renewal_override: string | null
+  status: string
+  plan_cycle: number
+}
+
+apiRouter.post(
+  '/joint-renewals',
   route((req, res) => {
-    const mainId = idParam(req.params.id, '会员记录')
-    const main = getSubscription(mainId)
-    if (main.joint_parent_id !== null) {
-      throw new HttpError(400, '附带会员不能作为联合会员的主会员')
-    }
-
     const body = req.body ?? {}
-    const mode = costMode(body.costMode)
-    if (!Array.isArray(body.childIds)) {
-      throw new HttpError(400, '附带会员格式不正确')
+    const total = integer(body.total, '总金额', 0, 1_000_000_000_000)
+    const paidAt = date(body.paidAt, '支付日期')
+    const months = cycle(body.cycleMonths)
+    if (months === 0) {
+      throw new HttpError(400, '联合续费周期必须大于 0')
     }
-    const rawChildIds = body.childIds as unknown[]
-    const childIds = [
-      ...new Set(rawChildIds.map((value) => integer(value, '附带会员', 1))),
+    const mode = costMode(body.costMode)
+    const note = optionalText(body.note, 300)
+
+    if (!Array.isArray(body.memberIds)) {
+      throw new HttpError(400, '参与会员格式不正确')
+    }
+    const rawMemberIds = body.memberIds as unknown[]
+    const memberIds = [
+      ...new Set(rawMemberIds.map((value) => integer(value, '参与会员', 1))),
     ]
-    if (childIds.includes(mainId)) {
-      throw new HttpError(400, '主会员不能同时作为附带会员')
+    if (memberIds.length < 2) {
+      throw new HttpError(400, '联合续费至少需要两个会员')
     }
 
-    for (const childId of childIds) {
-      const child = getSubscription(childId)
-      if (child.joint_parent_id !== null && child.joint_parent_id !== mainId) {
-        throw new HttpError(400, '该会员已属于其他联合会员')
-      }
-      const childCount = db
-        .prepare('SELECT COUNT(*) AS count FROM subscriptions WHERE joint_parent_id = ?')
-        .get(childId) as { count: number }
-      if (childCount.count > 0) {
-        throw new HttpError(400, '附带会员不能再包含其他会员')
-      }
+    const mainSubscriptionId = integer(body.mainSubscriptionId, '费用归属会员', 1)
+    if (!memberIds.includes(mainSubscriptionId)) {
+      throw new HttpError(400, '费用归属会员必须在参与会员中')
     }
+
+    const share = Math.floor(total / memberIds.length)
+    const remainder = total - share * memberIds.length
+
+    const memberStmt = db.prepare(
+      `SELECT s.id, s.started_at, s.next_renewal_override, s.status,
+              p.cycle_months AS plan_cycle
+       FROM subscriptions s
+       JOIN plans p ON p.id = s.plan_id
+       WHERE s.id = ?`,
+    )
+    const lastPaymentStmt = db.prepare(
+      `SELECT paid_at FROM payments
+       WHERE subscription_id = ?
+       ORDER BY paid_at DESC, id DESC
+       LIMIT 1`,
+    )
+    const insertJoint = db.prepare(
+      `INSERT INTO joint_renewals
+        (main_subscription_id, paid_at, total, cycle_months, cost_mode, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    const insertPayment = db.prepare(
+      `INSERT INTO payments
+        (subscription_id, paid_at, amount, note, joint_renewal_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    const update = db.prepare(
+      'UPDATE subscriptions SET next_renewal_override = ?, status = ? WHERE id = ?',
+    )
 
     db.transaction(() => {
-      db.prepare('UPDATE subscriptions SET joint_parent_id = NULL WHERE joint_parent_id = ?').run(
-        mainId,
+      const prepared = memberIds.map((memberId) => {
+        const member = memberStmt.get(memberId) as JointMemberRow | undefined
+        if (!member) throw new HttpError(404, '会员记录不存在')
+        const last = lastPaymentStmt.get(memberId) as { paid_at: string } | undefined
+        const currentNext =
+          member.next_renewal_override ||
+          addMonths(last?.paid_at ?? member.started_at, member.plan_cycle)
+        return { member, nextDate: addMonths(currentNext, months) }
+      })
+
+      const jointInfo = insertJoint.run(
+        mainSubscriptionId,
+        paidAt,
+        total,
+        months,
+        mode,
+        note,
+        nowISO(),
       )
-      const link = db.prepare('UPDATE subscriptions SET joint_parent_id = ? WHERE id = ?')
-      for (const childId of childIds) link.run(mainId, childId)
-      db.prepare('UPDATE subscriptions SET joint_cost_mode = ? WHERE id = ?').run(mode, mainId)
-      if (body.reallocate === true) {
-        reallocateLatestJointPurchase(mainId, childIds, mode)
+      const jointRenewalId = Number(jointInfo.lastInsertRowid)
+
+      for (const item of prepared) {
+        const isMain = item.member.id === mainSubscriptionId
+        const amount =
+          mode === 'main' ? (isMain ? total : 0) : share + (isMain ? remainder : 0)
+        insertPayment.run(
+          item.member.id,
+          paidAt,
+          amount,
+          note,
+          jointRenewalId,
+          nowISO(),
+        )
+        const nextStatus =
+          item.nextDate >= todayISO() ? 'active' : item.member.status
+        update.run(item.nextDate, nextStatus, item.member.id)
       }
     })()
 
+    res.status(201).json(buildState())
+  }),
+)
+
+apiRouter.delete(
+  '/joint-renewals/:id',
+  route((req, res) => {
+    const id = idParam(req.params.id, '联合续费记录')
+    const info = db.prepare('DELETE FROM joint_renewals WHERE id = ?').run(id)
+    if (info.changes === 0) throw new HttpError(404, '联合续费记录不存在')
     res.json(buildState())
   }),
 )
@@ -462,8 +459,14 @@ apiRouter.delete(
   '/payments/:id',
   route((req, res) => {
     const id = idParam(req.params.id, '支付记录')
-    const info = db.prepare('DELETE FROM payments WHERE id = ?').run(id)
-    if (info.changes === 0) throw new HttpError(404, '支付记录不存在')
+    const payment = db
+      .prepare('SELECT joint_renewal_id FROM payments WHERE id = ?')
+      .get(id) as { joint_renewal_id: number | null } | undefined
+    if (!payment) throw new HttpError(404, '支付记录不存在')
+    if (payment.joint_renewal_id !== null) {
+      throw new HttpError(400, '这笔支付属于联合续费，请删除整条联合续费记录')
+    }
+    db.prepare('DELETE FROM payments WHERE id = ?').run(id)
     res.json(buildState())
   }),
 )
