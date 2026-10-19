@@ -59,6 +59,7 @@ db.exec(`
     plan_id INTEGER NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
     captured_at TEXT NOT NULL,
     price INTEGER NOT NULL,
+    cycle_months INTEGER NOT NULL DEFAULT 0,
     platform TEXT,
     note TEXT,
     created_at TEXT NOT NULL
@@ -68,3 +69,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_subs_plan ON subscriptions(plan_id);
   CREATE INDEX IF NOT EXISTS idx_snapshots_plan ON price_snapshots(plan_id, captured_at);
 `)
+
+const snapshotColumns = db.prepare('PRAGMA table_info(price_snapshots)').all() as {
+  name: string
+}[]
+if (!snapshotColumns.some((column) => column.name === 'cycle_months')) {
+  db.exec('ALTER TABLE price_snapshots ADD COLUMN cycle_months INTEGER NOT NULL DEFAULT 0')
+  db.exec(
+    `UPDATE price_snapshots
+     SET cycle_months = COALESCE(
+       (SELECT cycle_months FROM plans WHERE plans.id = price_snapshots.plan_id),
+       12
+     )`,
+  )
+}

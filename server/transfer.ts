@@ -102,7 +102,7 @@ export function exportAll() {
       .all(),
     snapshots: db
       .prepare(
-        `SELECT id, plan_id, captured_at, price, platform, note, created_at
+        `SELECT id, plan_id, captured_at, price, cycle_months, platform, note, created_at
          FROM price_snapshots ORDER BY id`,
       )
       .all(),
@@ -116,7 +116,7 @@ export function importAll(payload: unknown): ImportSummary {
 
   const root = payload as Record<string, unknown>
   if (root.app !== undefined && root.app !== 'subledger') {
-    throw new HttpError(400, '这不是订阅账本的备份文件')
+    throw new HttpError(400, '这不是会员订阅的备份文件')
   }
 
   const services = asArray(root.services, '服务列表')
@@ -136,6 +136,7 @@ export function importAll(payload: unknown): ImportSummary {
   const run = db.transaction(() => {
     const serviceMap = new Map<number, number>()
     const planMap = new Map<number, number>()
+    const planCycleMap = new Map<number, number>()
     const subscriptionMap = new Map<number, number>()
 
     const findService = db.prepare('SELECT id FROM services WHERE name = ? COLLATE NOCASE')
@@ -161,8 +162,8 @@ export function importAll(payload: unknown): ImportSummary {
        VALUES (?, ?, ?, ?, ?)`,
     )
     const insertSnapshot = db.prepare(
-      `INSERT INTO price_snapshots (plan_id, captured_at, price, platform, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO price_snapshots (plan_id, captured_at, price, cycle_months, platform, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
 
     for (const row of services) {
@@ -208,6 +209,7 @@ export function importAll(payload: unknown): ImportSummary {
         planMap.set(oldId, Number(info.lastInsertRowid))
         summary.plansAdded += 1
       }
+      planCycleMap.set(oldId, cycleMonths)
     }
 
     for (const row of subscriptions) {
@@ -252,14 +254,19 @@ export function importAll(payload: unknown): ImportSummary {
     }
 
     for (const row of snapshots) {
-      const planId = planMap.get(integer(row.plan_id, '报价所属套餐', 1))
+      const oldPlanId = integer(row.plan_id, '报价所属套餐', 1)
+      const planId = planMap.get(oldPlanId)
       if (!planId) {
         throw new HttpError(400, '报价引用了不存在的套餐')
       }
+      const cycleMonths = normalizeCycle(
+        row.cycle_months ?? planCycleMap.get(oldPlanId) ?? 12,
+      )
       insertSnapshot.run(
         planId,
         date(row.captured_at, '报价日期'),
         integer(row.price, '报价价格', 0),
+        cycleMonths,
         optionalText(row.platform, 60),
         optionalText(row.note),
         createdStamp(row.created_at),

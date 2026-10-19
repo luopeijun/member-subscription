@@ -94,8 +94,8 @@ export function buildState() {
 
   const snapshotRows = db
     .prepare(
-      `SELECT ps.id, ps.plan_id, ps.captured_at, ps.price, ps.platform, ps.note,
-        s.name AS service_name, pl.name AS plan_name, pl.cycle_months
+      `SELECT ps.id, ps.plan_id, ps.captured_at, ps.price, ps.cycle_months, ps.platform, ps.note,
+        s.name AS service_name, pl.name AS plan_name
       FROM price_snapshots ps
       JOIN plans pl ON pl.id = ps.plan_id
       JOIN services s ON s.id = pl.service_id

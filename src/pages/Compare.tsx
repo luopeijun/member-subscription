@@ -51,7 +51,7 @@ function ComparePlan({
     : null
   const offers = latestPerPlatform(state.snapshots, plan.id)
   const monthlyOffers = offers
-    .map((offer) => equivalentMonthly(plan.cycleMonths, offer.price))
+    .map((offer) => equivalentMonthly(offer.cycleMonths, offer.price))
     .filter((value): value is number => value !== null)
   const lowestMonthly = monthlyOffers.length > 0 ? Math.min(...monthlyOffers) : null
 
@@ -116,7 +116,7 @@ function ComparePlan({
             <span />
           </div>
           {offers.map((offer) => {
-            const monthly = equivalentMonthly(plan.cycleMonths, offer.price)
+            const monthly = equivalentMonthly(offer.cycleMonths, offer.price)
             const diff =
               monthly !== null && myMonthly !== null ? monthly - myMonthly : null
             const isCurrent =
@@ -137,7 +137,7 @@ function ComparePlan({
                 </span>
                 <span className="offer-price">
                   {formatCNY(offer.price)}
-                  <small> / {cycleLabel(plan.cycleMonths)}</small>
+                  <small> / {cycleLabel(offer.cycleMonths)}</small>
                 </span>
                 <span className="offer-monthly">
                   {monthly !== null ? `${formatCNY(monthly)}/月` : '—'}

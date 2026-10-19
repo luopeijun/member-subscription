@@ -383,18 +383,22 @@ apiRouter.post(
   route((req, res) => {
     const body = req.body ?? {}
     const planId = integer(body.planId, '套餐', 1)
-    const plan = db.prepare('SELECT id FROM plans WHERE id = ?').get(planId)
+    const plan = db
+      .prepare('SELECT id, cycle_months FROM plans WHERE id = ?')
+      .get(planId) as { id: number; cycle_months: number } | undefined
     if (!plan) throw new HttpError(404, '套餐不存在')
 
     const capturedAt = date(body.capturedAt, '记录日期')
     const price = integer(body.price, '价格', 0, 1_000_000_000_000)
+    const cycleMonths =
+      body.cycleMonths === undefined ? plan.cycle_months : cycle(body.cycleMonths)
     const platform = text(body.platform, '平台', 60)
     const note = optionalText(body.note, 300)
 
     db.prepare(
-      `INSERT INTO price_snapshots (plan_id, captured_at, price, platform, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(planId, capturedAt, price, platform, note, nowISO())
+      `INSERT INTO price_snapshots (plan_id, captured_at, price, cycle_months, platform, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(planId, capturedAt, price, cycleMonths, platform, note, nowISO())
 
     res.status(201).json(buildState())
   }),

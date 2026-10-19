@@ -369,7 +369,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
         </div>
 
         {editing ? (
-          <p className="form-hint">修改计费周期会重新计算年化成本；历史支付金额不会被改写。</p>
+          <p className="form-hint">修改计费周期会重新计算月均成本；历史支付金额不会被改写。</p>
         ) : null}
 
         {error ? <div className="form-error">{error}</div> : null}
@@ -532,6 +532,7 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
     plan.listPrice ? String(toMajor(plan.listPrice)) : '',
   )
   const [platform, setPlatform] = useState('')
+  const [cycleMonths, setCycleMonths] = useState(plan.cycleMonths)
   const [capturedAt, setCapturedAt] = useState(today)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -557,6 +558,7 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
           planId: plan.id,
           capturedAt,
           price: toMinor(priceNumber),
+          cycleMonths,
           platform: platform.trim(),
           note: note.trim() || null,
         }),
@@ -601,6 +603,19 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
               placeholder="0.00"
               onChange={(event) => setPrice(event.target.value)}
             />
+          </div>
+          <div className="field">
+            <label>计费周期 *</label>
+            <select
+              value={cycleMonths}
+              onChange={(event) => setCycleMonths(Number(event.target.value))}
+            >
+              {CYCLE_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="field">
             <label>看到价格的日期</label>
