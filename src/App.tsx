@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent } from 'react'
 import { api } from './api'
 import type {
   AppState,
+  JointQuote,
   JointRenewal,
   Payment,
   Plan,
@@ -13,6 +14,7 @@ import { Subscriptions } from './pages/Subscriptions'
 import { Payments } from './pages/Payments'
 import { Compare } from './pages/Compare'
 import {
+  JointQuoteForm,
   PaymentForm,
   PlanForm,
   SnapshotForm,
@@ -56,6 +58,7 @@ type ModalState =
   | { kind: 'payment' }
   | { kind: 'snapshot'; plan: Plan }
   | { kind: 'plan' }
+  | { kind: 'jointQuote' }
   | null
 
 type Toast = { message: string; kind: 'ok' | 'err' }
@@ -65,6 +68,7 @@ type ImportSummary = {
   plansAdded: number
   subscriptionsAdded: number
   jointRenewalsAdded: number
+  jointQuotesAdded: number
   paymentsAdded: number
   snapshotsAdded: number
 }
@@ -187,6 +191,24 @@ export default function App() {
     }
   }
 
+  const handleDeleteJointQuote = async (jointQuote: JointQuote) => {
+    if (
+      !window.confirm(
+        `删除「${jointQuote.platform ?? '未标注'}」在 ${jointQuote.capturedAt} 记录的联合报价？`,
+      )
+    ) {
+      return
+    }
+    try {
+      setState(
+        await api<AppState>(`/joint-quotes/${jointQuote.id}`, { method: 'DELETE' }),
+      )
+      notify('已删除联合报价')
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
   const handleSeed = async () => {
     if (state && (state.services.length > 0 || state.plans.length > 0)) {
       notify('已有数据，请先清空后再载入示例数据', 'err')
@@ -262,6 +284,9 @@ export default function App() {
       ]
       if (counts.jointRenewalsAdded > 0) {
         parts.push(`联合续费 ${counts.jointRenewalsAdded} 条`)
+      }
+      if (counts.jointQuotesAdded > 0) {
+        parts.push(`联合报价 ${counts.jointQuotesAdded} 条`)
       }
       notify(`导入完成：${parts.join('、')}`)
     } catch (error) {
@@ -366,6 +391,8 @@ export default function App() {
             onSnapshot={(plan) => setModal({ kind: 'snapshot', plan })}
             onDeletePlan={(plan) => void handleDeletePlan(plan)}
             onDeleteSnapshot={(snapshot) => void handleDeleteSnapshot(snapshot)}
+            onAddJointQuote={() => setModal({ kind: 'jointQuote' })}
+            onDeleteJointQuote={(jointQuote) => void handleDeleteJointQuote(jointQuote)}
           />
         ) : null}
 
@@ -435,6 +462,10 @@ export default function App() {
 
       {modal?.kind === 'plan' ? (
         <PlanForm state={state} onClose={closeModal} onSaved={handleSaved} />
+      ) : null}
+
+      {modal?.kind === 'jointQuote' ? (
+        <JointQuoteForm state={state} onClose={closeModal} onSaved={handleSaved} />
       ) : null}
 
       {toast ? <div className={`toast ${toast.kind}`}>{toast.message}</div> : null}

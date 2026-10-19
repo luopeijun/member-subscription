@@ -8,7 +8,7 @@ import {
   PLATFORM_SUGGESTIONS,
   STATUS_OPTIONS,
 } from './ui'
-import { toMajor, toMinor } from '../../shared/money'
+import { formatCNY, toMajor, toMinor } from '../../shared/money'
 
 type SavedHandler = (next: AppState, message: string) => void
 
@@ -796,6 +796,280 @@ export function PlanForm({ state, onClose, onSaved }: PlanFormProps) {
           </button>
           <button type="submit" className="btn primary" disabled={busy}>
             {busy ? '保存中…' : '添加套餐'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+/* ---------------------------------- 联合报价 --------------------------------- */
+
+type JointQuoteFormProps = {
+  state: AppState
+  onClose: () => void
+  onSaved: SavedHandler
+}
+
+function monthlyEquivalent(sub: Subscription): number | null {
+  if (sub.cycleMonths <= 0 || !sub.lastPayment) return null
+  return Math.round(sub.lastPayment.amount / sub.cycleMonths)
+}
+
+export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps) {
+  const [memberIds, setMemberIds] = useState<number[]>([])
+  const [picker, setPicker] = useState('')
+  const [platform, setPlatform] = useState('')
+  const [total, setTotal] = useState('')
+  const [cycleMonths, setCycleMonths] = useState(12)
+  const [capturedAt, setCapturedAt] = useState(state.today)
+  const [note, setNote] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const selected = memberIds
+    .map((id) => state.subscriptions.find((sub) => sub.id === id))
+    .filter((sub): sub is Subscription => Boolean(sub))
+
+  const options = [...state.subscriptions]
+    .filter((sub) => !memberIds.includes(sub.id))
+    .sort((a, b) => a.serviceName.localeCompare(b.serviceName, 'zh-CN'))
+
+  const totalFen =
+    total === '' || !Number.isFinite(Number(total)) ? 0 : toMinor(Number(total))
+  const quoteMonthly =
+    cycleMonths > 0 && total !== '' ? Math.round(totalFen / cycleMonths) : null
+  const currentMonthly = selected.reduce(
+    (sum, sub) => sum + (monthlyEquivalent(sub) ?? 0),
+    0,
+  )
+  const excluded = selected.filter((sub) => monthlyEquivalent(sub) === null).length
+  const diff = quoteMonthly !== null ? quoteMonthly - currentMonthly : null
+
+  const addMember = () => {
+    const id = Number(picker)
+    if (!id) return
+    setMemberIds((current) => [...current, id])
+    setPicker('')
+    setError(null)
+  }
+
+  const removeMember = (id: number) => {
+    setMemberIds((current) => current.filter((item) => item !== id))
+  }
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    if (selected.length < 2) {
+      setError('联合报价至少选择两个会员')
+      return
+    }
+    if (!platform.trim()) {
+      setError('请填写平台名称')
+      return
+    }
+    if (total === '' || !Number.isFinite(Number(total)) || Number(total) < 0) {
+      setError('请填写整条报价金额')
+      return
+    }
+
+    setBusy(true)
+    try {
+      const next = await api<AppState>('/joint-quotes', {
+        method: 'POST',
+        body: JSON.stringify({
+          capturedAt,
+          total: totalFen,
+          cycleMonths,
+          platform: platform.trim(),
+          note: note.trim() || null,
+          subscriptionIds: memberIds,
+        }),
+      })
+      onSaved(next, '联合报价已记录')
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      title="记录联合报价"
+      subtitle="把整条捆绑装的价格和当前组合的月均成本对比"
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        <div className="field">
+          <label>这条报价包含哪些会员</label>
+          <div className="joint-add-row">
+            <select
+              value={picker}
+              onChange={(event) => setPicker(event.target.value)}
+            >
+              <option value="">选择要添加的会员</option>
+              {options.map((sub) => (
+                <option key={sub.id} value={sub.id}>
+                  {sub.serviceName} · {sub.planName}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn"
+              onClick={addMember}
+              disabled={!picker}
+            >
+              添加
+            </button>
+          </div>
+          <p className="joint-hint">
+            选择你现在持有的会员，用来计算「当前组合」的月均成本。
+          </p>
+        </div>
+
+        <div className="field" style={{ marginTop: 12 }}>
+          <label>已添加的会员</label>
+          {selected.length === 0 ? (
+            <p className="joint-hint">还没有添加会员。至少添加两个才能记录联合报价。</p>
+          ) : (
+            <div className="joint-members">
+              {selected.map((sub) => {
+                const monthly = monthlyEquivalent(sub)
+                return (
+                  <div key={sub.id} className="joint-member picked">
+                    <div className="joint-member-main">
+                      <strong>{sub.serviceName}</strong>
+                      <span>
+                        {sub.planName}
+                        {sub.lastPayment
+                          ? ` · 最近 ${formatCNY(sub.lastPayment.amount)}`
+                          : ' · 未记录支付'}
+                      </span>
+                    </div>
+                    <span className="joint-member-cost">
+                      {monthly === null ? '一次性' : `${formatCNY(monthly)}/月`}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn sm"
+                      onClick={() => removeMember(sub.id)}
+                    >
+                      移除
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="form-grid" style={{ marginTop: 14 }}>
+          <div className="field">
+            <label>平台 *</label>
+            <input
+              list="joint-quote-platforms"
+              value={platform}
+              placeholder="淘宝 / 闲鱼 / 拼车群"
+              onChange={(event) => setPlatform(event.target.value)}
+            />
+            <datalist id="joint-quote-platforms">
+              {PLATFORM_SUGGESTIONS.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+          </div>
+          <div className="field">
+            <label>整条报价（元）*</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={total}
+              placeholder="0.00"
+              onChange={(event) => setTotal(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label>计费周期</label>
+            <select
+              value={cycleMonths}
+              onChange={(event) => setCycleMonths(Number(event.target.value))}
+            >
+              {CYCLE_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>看到价格的日期</label>
+            <input
+              type="date"
+              value={capturedAt}
+              onChange={(event) => setCapturedAt(event.target.value)}
+            />
+          </div>
+          <div className="field span-2">
+            <label>怎么买 / 备注</label>
+            <input
+              value={note}
+              placeholder="例如：代充；需要提供账号；含 4 个会员"
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="quote-preview">
+          <div className="quote-preview-row">
+            <span>当前组合</span>
+            <strong>
+              {selected.length === 0 ? '—' : `${formatCNY(currentMonthly)}/月`}
+            </strong>
+          </div>
+          <div className="quote-preview-row">
+            <span>整条报价</span>
+            <strong>
+              {quoteMonthly === null
+                ? '—'
+                : `${formatCNY(quoteMonthly)}/月`}
+            </strong>
+          </div>
+          <div className="quote-preview-row">
+            <span>差额</span>
+            {diff === null ? (
+              <span className="muted">—</span>
+            ) : diff < 0 ? (
+              <span className="badge ok">省 {formatCNY(-diff)}/月</span>
+            ) : diff > 0 ? (
+              <span className="badge warn">贵 {formatCNY(diff)}/月</span>
+            ) : (
+              <span className="badge muted">持平</span>
+            )}
+          </div>
+        </div>
+
+        {excluded > 0 ? (
+          <p className="joint-hint">
+            有 {excluded} 个会员是一次性购买，未计入月均成本。
+          </p>
+        ) : null}
+
+        {error ? <div className="form-error">{error}</div> : null}
+
+        <div className="modal-foot">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+            取消
+          </button>
+          <button
+            type="submit"
+            className="btn primary"
+            disabled={busy || selected.length < 2 || !platform.trim()}
+          >
+            {busy ? '保存中…' : '记录报价'}
           </button>
         </div>
       </form>
