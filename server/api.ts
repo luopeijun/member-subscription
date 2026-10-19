@@ -163,6 +163,8 @@ function getSubscription(id: number) {
         status: string
         shared_with: string | null
         note: string | null
+        joint_parent_id: number | null
+        joint_cost_mode: string
       }
     | undefined
   if (!sub) throw new HttpError(404, '会员记录不存在')
@@ -181,6 +183,84 @@ function insertPayment(subscriptionId: number, body: Record<string, unknown>) {
     .run(subscriptionId, paidAt, amount, optionalText(body.note, 300), nowISO())
 
   return { id: Number(info.lastInsertRowid), amount }
+}
+
+type JointCostMode = 'split' | 'main'
+
+function costMode(value: unknown): JointCostMode {
+  if (value === 'split' || value === 'main') return value
+  throw new HttpError(400, '费用归属不正确')
+}
+
+type JointPaymentRow = {
+  id: number
+  subscription_id: number
+  paid_at: string
+  amount: number
+  joint_purchase_id: string | null
+}
+
+function reallocateLatestJointPurchase(
+  mainId: number,
+  childIds: number[],
+  mode: JointCostMode,
+) {
+  const ids = [mainId, ...childIds]
+  const placeholders = ids.map(() => '?').join(', ')
+  const rows = db
+    .prepare(
+      `SELECT id, subscription_id, paid_at, amount, joint_purchase_id
+       FROM payments
+       WHERE subscription_id IN (${placeholders})
+       ORDER BY paid_at DESC, id DESC`,
+    )
+    .all(...ids) as JointPaymentRow[]
+
+  if (rows.length === 0) return
+
+  const mainPayments = rows.filter((row) => row.subscription_id === mainId)
+  if (mainPayments.length === 0) return
+
+  const latestJoint = mainPayments.find((row) => row.joint_purchase_id)
+  const group = latestJoint?.joint_purchase_id
+    ? rows.filter((row) => row.joint_purchase_id === latestJoint.joint_purchase_id)
+    : rows.filter((row) => row.paid_at === mainPayments[0].paid_at)
+
+  const bySubscription = new Map<number, JointPaymentRow>()
+  for (const row of group) {
+    if (!bySubscription.has(row.subscription_id)) {
+      bySubscription.set(row.subscription_id, row)
+    }
+  }
+
+  const participants = ids.filter((id) => bySubscription.has(id))
+  if (participants.length === 0) return
+
+  const total = participants.reduce(
+    (sum, id) => sum + (bySubscription.get(id)?.amount ?? 0),
+    0,
+  )
+  if (total <= 0) return
+
+  const update = db.prepare('UPDATE payments SET amount = ? WHERE id = ?')
+
+  if (mode === 'main') {
+    const mainPayment = bySubscription.get(mainId)
+    if (!mainPayment) return
+    update.run(total, mainPayment.id)
+    for (const id of participants) {
+      if (id === mainId) continue
+      update.run(0, bySubscription.get(id)!.id)
+    }
+    return
+  }
+
+  const base = Math.floor(total / participants.length)
+  const remainder = total - base * participants.length
+  const remainderTarget = bySubscription.has(mainId) ? mainId : participants[0]
+  for (const id of participants) {
+    update.run(base + (id === remainderTarget ? remainder : 0), bySubscription.get(id)!.id)
+  }
 }
 
 export const apiRouter = Router()
@@ -313,6 +393,57 @@ apiRouter.delete(
     const id = idParam(req.params.id, '会员记录')
     getSubscription(id)
     db.prepare('DELETE FROM subscriptions WHERE id = ?').run(id)
+    res.json(buildState())
+  }),
+)
+
+apiRouter.put(
+  '/subscriptions/:id/joint',
+  route((req, res) => {
+    const mainId = idParam(req.params.id, '会员记录')
+    const main = getSubscription(mainId)
+    if (main.joint_parent_id !== null) {
+      throw new HttpError(400, '附带会员不能作为联合会员的主会员')
+    }
+
+    const body = req.body ?? {}
+    const mode = costMode(body.costMode)
+    if (!Array.isArray(body.childIds)) {
+      throw new HttpError(400, '附带会员格式不正确')
+    }
+    const rawChildIds = body.childIds as unknown[]
+    const childIds = [
+      ...new Set(rawChildIds.map((value) => integer(value, '附带会员', 1))),
+    ]
+    if (childIds.includes(mainId)) {
+      throw new HttpError(400, '主会员不能同时作为附带会员')
+    }
+
+    for (const childId of childIds) {
+      const child = getSubscription(childId)
+      if (child.joint_parent_id !== null && child.joint_parent_id !== mainId) {
+        throw new HttpError(400, '该会员已属于其他联合会员')
+      }
+      const childCount = db
+        .prepare('SELECT COUNT(*) AS count FROM subscriptions WHERE joint_parent_id = ?')
+        .get(childId) as { count: number }
+      if (childCount.count > 0) {
+        throw new HttpError(400, '附带会员不能再包含其他会员')
+      }
+    }
+
+    db.transaction(() => {
+      db.prepare('UPDATE subscriptions SET joint_parent_id = NULL WHERE joint_parent_id = ?').run(
+        mainId,
+      )
+      const link = db.prepare('UPDATE subscriptions SET joint_parent_id = ? WHERE id = ?')
+      for (const childId of childIds) link.run(mainId, childId)
+      db.prepare('UPDATE subscriptions SET joint_cost_mode = ? WHERE id = ?').run(mode, mainId)
+      if (body.reallocate === true) {
+        reallocateLatestJointPurchase(mainId, childIds, mode)
+      }
+    })()
+
     res.json(buildState())
   }),
 )

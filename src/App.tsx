@@ -11,6 +11,7 @@ import {
   SnapshotForm,
   SubscriptionForm,
 } from './components/forms'
+import { JointForm } from './components/JointForm'
 
 type Tab = 'dashboard' | 'subscriptions' | 'payments' | 'compare'
 
@@ -44,6 +45,7 @@ type ModalState =
   | { kind: 'add' }
   | { kind: 'edit'; subscription: Subscription }
   | { kind: 'renew'; subscription: Subscription }
+  | { kind: 'joint'; subscription?: Subscription }
   | { kind: 'payment' }
   | { kind: 'snapshot'; plan: Plan }
   | { kind: 'plan' }
@@ -305,6 +307,8 @@ export default function App() {
           <Subscriptions
             state={state}
             onAdd={() => setModal({ kind: 'add' })}
+            onAddJoint={() => setModal({ kind: 'joint' })}
+            onJoint={(subscription) => setModal({ kind: 'joint', subscription })}
             onEdit={(subscription) => setModal({ kind: 'edit', subscription })}
             onRenew={(subscription) => setModal({ kind: 'renew', subscription })}
             onDelete={(subscription) => void handleDeleteSubscription(subscription)}
@@ -367,6 +371,15 @@ export default function App() {
         <PaymentForm
           state={state}
           subscription={modal.subscription}
+          onClose={closeModal}
+          onSaved={handleSaved}
+        />
+      ) : null}
+
+      {modal?.kind === 'joint' ? (
+        <JointForm
+          state={state}
+          main={modal.subscription}
           onClose={closeModal}
           onSaved={handleSaved}
         />

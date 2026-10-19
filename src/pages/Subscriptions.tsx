@@ -12,6 +12,8 @@ import {
 type Props = {
   state: AppState
   onAdd: () => void
+  onAddJoint: () => void
+  onJoint: (subscription: Subscription) => void
   onEdit: (subscription: Subscription) => void
   onRenew: (subscription: Subscription) => void
   onDelete: (subscription: Subscription) => void
@@ -25,7 +27,15 @@ const FILTERS = [
 
 type Filter = (typeof FILTERS)[number]['value']
 
-export function Subscriptions({ state, onAdd, onEdit, onRenew, onDelete }: Props) {
+export function Subscriptions({
+  state,
+  onAdd,
+  onAddJoint,
+  onJoint,
+  onEdit,
+  onRenew,
+  onDelete,
+}: Props) {
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
 
@@ -96,6 +106,9 @@ export function Subscriptions({ state, onAdd, onEdit, onRenew, onDelete }: Props
               </button>
             ) : null}
           </div>
+          <button className="btn" onClick={onAddJoint}>
+            + 添加联合会员
+          </button>
           <button className="btn primary" onClick={onAdd}>
             + 添加会员
           </button>
@@ -147,14 +160,28 @@ export function Subscriptions({ state, onAdd, onEdit, onRenew, onDelete }: Props
               </header>
 
               <div className="tag-row">
-                <span className="badge muted">{sub.platform ?? '平台未记录'}</span>
+                {sub.jointChildren.length > 0 ? (
+                  <span className="badge joint">
+                    联合会员 · 含 {sub.jointChildren.length} 个
+                  </span>
+                ) : null}
+                {sub.jointParentId !== null ? (
+                  <span className="badge joint">
+                    随 {sub.jointParentName ?? '主会员'} 续费
+                  </span>
+                ) : null}
+                {sub.platform === '联合会员' ? null : (
+                  <span className="badge muted">{sub.platform ?? '平台未记录'}</span>
+                )}
                 {sub.autoRenew ? (
                   <span className="badge info">自动续费</span>
                 ) : (
                   <span className="badge muted">手动续费</span>
                 )}
                 {sub.sharedWith ? <span className="badge muted">{sub.sharedWith}</span> : null}
-                {sub.note ? <span className="badge muted">{sub.note}</span> : null}
+                {sub.note && !/^联合会员（.+）$/.test(sub.note) ? (
+                  <span className="badge muted">{sub.note}</span>
+                ) : null}
               </div>
 
               <div className="sub-price">
@@ -215,6 +242,11 @@ export function Subscriptions({ state, onAdd, onEdit, onRenew, onDelete }: Props
               </div>
 
               <footer className="sub-actions">
+                {sub.jointChildren.length > 0 ? (
+                  <button className="btn sm" onClick={() => onJoint(sub)}>
+                    联合设置
+                  </button>
+                ) : null}
                 <button className="btn sm" onClick={() => onRenew(sub)}>
                   记一笔续费
                 </button>
