@@ -280,12 +280,6 @@ export default function App() {
               </button>
             ))}
           </nav>
-
-          <div className="top-actions">
-            <button className="btn primary" onClick={() => setModal({ kind: 'add' })}>
-              + 添加会员
-            </button>
-          </div>
         </div>
       </header>
 
