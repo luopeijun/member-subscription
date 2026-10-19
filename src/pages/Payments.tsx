@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import type { AppState, Payment } from '../types'
 import { formatCNY } from '../../shared/money'
 import { EmptyState } from '../ui'
@@ -9,15 +10,29 @@ type Props = {
 }
 
 export function Payments({ state, onAdd, onDelete }: Props) {
-  const total = state.payments.reduce((sum, payment) => sum + payment.amount, 0)
-  const average = state.payments.length > 0 ? Math.round(total / state.payments.length) : 0
+  const [query, setQuery] = useState('')
+  const keyword = query.trim().toLowerCase()
+
+  const list = useMemo(
+    () =>
+      state.payments.filter(
+        (payment) =>
+          !keyword ||
+          payment.serviceName.toLowerCase().includes(keyword) ||
+          payment.planName.toLowerCase().includes(keyword),
+      ),
+    [state.payments, keyword],
+  )
+
+  const total = list.reduce((sum, payment) => sum + payment.amount, 0)
+  const average = list.length > 0 ? Math.round(total / list.length) : 0
 
   return (
     <div className="stack">
       <div className="toolbar">
         <div className="inline-stats">
           <span>
-            共 <strong>{state.payments.length}</strong> 笔
+            共 <strong>{list.length}</strong> 笔
           </span>
           <span>
             合计 <strong>{formatCNY(total)}</strong>
@@ -26,9 +41,29 @@ export function Payments({ state, onAdd, onDelete }: Props) {
             单笔均值 <strong>{formatCNY(average)}</strong>
           </span>
         </div>
-        <button className="btn primary" onClick={onAdd} disabled={state.subscriptions.length === 0}>
-          + 记一笔支付
-        </button>
+        <div className="toolbar-right">
+          <div className="search-box">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索会员名称"
+              aria-label="搜索会员名称"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="search-clear"
+                onClick={() => setQuery('')}
+                aria-label="清除搜索"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          <button className="btn primary" onClick={onAdd} disabled={state.subscriptions.length === 0}>
+            + 记一笔支付
+          </button>
+        </div>
       </div>
 
       {state.payments.length === 0 ? (
@@ -47,6 +82,18 @@ export function Payments({ state, onAdd, onDelete }: Props) {
             }
           />
         </div>
+      ) : list.length === 0 ? (
+        <div className="card card-pad">
+          <EmptyState
+            title="没有找到匹配的流水"
+            description={`会员名称里没有包含「${query.trim()}」的支付记录。`}
+            action={
+              <button className="btn" onClick={() => setQuery('')}>
+                清除搜索
+              </button>
+            }
+          />
+        </div>
       ) : (
         <div className="card table-card">
           <table className="table">
@@ -60,7 +107,7 @@ export function Payments({ state, onAdd, onDelete }: Props) {
               </tr>
             </thead>
             <tbody>
-              {state.payments.map((payment) => (
+              {list.map((payment) => (
                 <tr key={payment.id}>
                   <td className="nowrap">{payment.paidAt}</td>
                   <td>

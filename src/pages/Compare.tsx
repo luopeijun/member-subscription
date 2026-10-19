@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { AppState, Plan, Snapshot, Subscription } from '../types'
 import { formatCNY } from '../../shared/money'
 import {
@@ -177,15 +177,36 @@ export function Compare({
   onDeletePlan,
   onDeleteSnapshot,
 }: Props) {
+  const [query, setQuery] = useState('')
+  const keyword = query.trim().toLowerCase()
+
   const groups = useMemo(() => {
     const map = new Map<string, { category: string; plans: Plan[] }>()
     for (const plan of state.plans) {
+      if (
+        keyword &&
+        !plan.serviceName.toLowerCase().includes(keyword) &&
+        !plan.name.toLowerCase().includes(keyword)
+      ) {
+        continue
+      }
       const group = map.get(plan.serviceName) ?? { category: plan.category, plans: [] }
       group.plans.push(plan)
       map.set(plan.serviceName, group)
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-  }, [state.plans])
+  }, [state.plans, keyword])
+
+  const history = useMemo(
+    () =>
+      state.snapshots.filter(
+        (snapshot) =>
+          !keyword ||
+          snapshot.serviceName.toLowerCase().includes(keyword) ||
+          snapshot.planName.toLowerCase().includes(keyword),
+      ),
+    [state.snapshots, keyword],
+  )
 
   return (
     <div className="stack">
@@ -196,9 +217,29 @@ export function Compare({
             <strong>{state.snapshots.length}</strong> 条平台报价
           </span>
         </div>
-        <button className="btn primary" onClick={onAddPlan}>
-          + 添加候选套餐
-        </button>
+        <div className="toolbar-right">
+          <div className="search-box">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索会员名称"
+              aria-label="搜索会员名称"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="search-clear"
+                onClick={() => setQuery('')}
+                aria-label="清除搜索"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          <button className="btn primary" onClick={onAddPlan}>
+            + 添加候选套餐
+          </button>
+        </div>
       </div>
 
       <p className="page-note">
@@ -209,15 +250,27 @@ export function Compare({
 
       {groups.length === 0 ? (
         <div className="card card-pad">
-          <EmptyState
-            title="还没有可比较的套餐"
-            description="点「添加候选套餐」录入同一服务的不同套餐或不同价格档位，再记录每个平台的报价，就能看到换平台是否划算。"
-            action={
-              <button className="btn primary" onClick={onAddPlan}>
-                添加候选套餐
-              </button>
-            }
-          />
+          {keyword ? (
+            <EmptyState
+              title="没有找到匹配的套餐"
+              description={`会员名称里没有包含「${query.trim()}」的套餐。`}
+              action={
+                <button className="btn" onClick={() => setQuery('')}>
+                  清除搜索
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="还没有可比较的套餐"
+              description="点「添加候选套餐」录入同一服务的不同套餐或不同价格档位，再记录每个平台的报价，就能看到换平台是否划算。"
+              action={
+                <button className="btn primary" onClick={onAddPlan}>
+                  添加候选套餐
+                </button>
+              }
+            />
+          )}
         </div>
       ) : (
         groups.map(([serviceName, group]) => (
@@ -246,7 +299,7 @@ export function Compare({
         ))
       )}
 
-      {state.snapshots.length > 0 ? (
+      {history.length > 0 ? (
         <section className="card card-pad">
           <div className="card-head">
             <div>
@@ -255,7 +308,7 @@ export function Compare({
             </div>
           </div>
           <div className="history-list">
-            {state.snapshots.map((snapshot) => (
+            {history.map((snapshot) => (
               <div className="history-row" key={snapshot.id}>
                 <span className="history-date">{formatDay(snapshot.capturedAt)}</span>
                 <span className="history-platform">{snapshot.platform ?? '未标注'}</span>
