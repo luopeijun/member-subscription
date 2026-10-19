@@ -1,0 +1,85 @@
+# 会员订阅
+
+一个本地优先的会员订阅管理工具：记录会员、实际支付、到期日，对比平台价格，并支持 JSON 导入导出。数据保存在本机 SQLite，不依赖账号或云服务。
+
+## 功能
+
+- **总览**：月均 / 年均订阅支出、分类月均、近 12 个月现金流、90 天内到期提醒
+- **会员**：服务、套餐、计费周期（月付 / 季付 / 半年付 / 年付 / 一次性）、状态（活跃 / 已过期）、搜索
+- **流水**：每次实际支付记录、按会员搜索、分页（可选每页条数，支持首页 / 末页）
+- **比价**：记录各平台报价（每条报价有独立周期），折算月均成本并和自己的价格对比
+- **数据管理**：JSON 导出、追加式导入、清空全部数据
+- **金额**：人民币；数据库以「分」存储，界面显示元
+
+## 技术栈
+
+- 前端：Vite + React 18 + TypeScript
+- 后端：Express
+- 数据库：SQLite（better-sqlite3）
+- 开发模式下 Vite 以中间件方式运行在 Express 中，前后端同端口
+
+## 快速开始
+
+要求：Node.js 20+、npm。
+
+```bash
+npm install
+npm run dev
+```
+
+打开 <http://localhost:5173>。默认只监听 `127.0.0.1`，不会暴露到局域网。
+
+生产模式：
+
+```bash
+npm run build
+npm start
+```
+
+可通过环境变量修改端口和监听地址：
+
+```bash
+PORT=8080 HOST=0.0.0.0 npm start
+```
+
+## 常用脚本
+
+| 命令 | 说明 |
+| --- | --- |
+| `npm run dev` | 开发模式，Vite + API 同一进程 |
+| `npm run build` | TypeScript 检查并构建前端 |
+| `npm start` | 生产模式，服务 `dist/` 和 API |
+| `npm run typecheck` | 只做 TypeScript 类型检查 |
+
+## 数据与备份
+
+- 数据库文件：`data/app.db`（SQLite，WAL 模式）
+- `data/` 已加入 `.gitignore`，个人数据不会提交
+- 备份：页面底部「导出数据」会下载完整 JSON
+- 导入是**追加**，不会覆盖已有记录
+- 清空数据需要二次确认，且无法恢复
+
+## 项目结构
+
+```text
+server/
+  api.ts        API 路由与参数校验
+  db.ts         SQLite 表结构与迁移
+  store.ts      聚合出前端所需的完整状态
+  transfer.ts   JSON 导入导出
+  index.ts      Express 服务与 Vite 中间件
+shared/
+  money.ts      分 / 元转换与金额格式化
+src/
+  components/   通用组件（分页器、弹窗、表单）
+  pages/        总览、会员、流水、比价
+  App.tsx       页面布局与弹窗调度
+  api.ts        前端 API 请求
+  types.ts      共享类型
+  styles.css    全局样式
+```
+
+## Roadmap
+
+- [ ] 联合会员：主会员 + 附带会员，支持「均分」或「主会员承担」两种费用归属，续费时联动顺延
+- [ ] 联合会员比价：按整条联合报价对比当前组合的月均成本
