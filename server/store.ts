@@ -75,6 +75,23 @@ type SnapshotRow = {
   cycle_months: number
 }
 
+type JointQuoteRow = {
+  id: number
+  captured_at: string
+  total: number
+  cycle_months: number
+  platform: string | null
+  note: string | null
+}
+
+type JointQuoteItemRow = {
+  joint_quote_id: number
+  subscription_id: number
+  service_name: string
+  plan_name: string
+  cycle_months: number
+}
+
 export function buildState() {
   const services = db
     .prepare('SELECT id, name, category FROM services ORDER BY name COLLATE NOCASE')
@@ -156,11 +173,38 @@ export function buildState() {
     )
     .all() as SnapshotRow[]
 
+  const jointQuoteRows = db
+    .prepare(
+      `SELECT jq.id, jq.captured_at, jq.total, jq.cycle_months, jq.platform, jq.note
+      FROM joint_quotes jq
+      ORDER BY jq.captured_at DESC, jq.id DESC`,
+    )
+    .all() as JointQuoteRow[]
+
+  const jointQuoteItemRows = db
+    .prepare(
+      `SELECT jqi.joint_quote_id, jqi.subscription_id,
+        s.name AS service_name, pl.name AS plan_name, pl.cycle_months
+      FROM joint_quote_items jqi
+      JOIN subscriptions sub ON sub.id = jqi.subscription_id
+      JOIN plans pl ON pl.id = sub.plan_id
+      JOIN services s ON s.id = pl.service_id
+      ORDER BY jqi.id`,
+    )
+    .all() as JointQuoteItemRow[]
+
   const paymentsBySub = new Map<number, PaymentRow[]>()
   for (const payment of paymentRows) {
     const list = paymentsBySub.get(payment.subscription_id) ?? []
     list.push(payment)
     paymentsBySub.set(payment.subscription_id, list)
+  }
+
+  const jointQuoteItemsByQuote = new Map<number, JointQuoteItemRow[]>()
+  for (const item of jointQuoteItemRows) {
+    const list = jointQuoteItemsByQuote.get(item.joint_quote_id) ?? []
+    list.push(item)
+    jointQuoteItemsByQuote.set(item.joint_quote_id, list)
   }
 
   const today = todayISO()
@@ -325,6 +369,25 @@ export function buildState() {
       price: snapshot.price,
       platform: snapshot.platform,
       note: snapshot.note,
+    })),
+    jointQuotes: jointQuoteRows.map((quote) => ({
+      id: quote.id,
+      capturedAt: quote.captured_at,
+      total: quote.total,
+      cycleMonths: quote.cycle_months,
+      platform: quote.platform,
+      note: quote.note,
+      items: (jointQuoteItemsByQuote.get(quote.id) ?? []).map((item) => {
+        const payments = paymentsBySub.get(item.subscription_id) ?? []
+        const latest = payments.at(-1) ?? null
+        return {
+          subscriptionId: item.subscription_id,
+          serviceName: item.service_name,
+          planName: item.plan_name,
+          cycleMonths: item.cycle_months,
+          amount: latest ? latest.amount : null,
+        }
+      }),
     })),
     stats: {
       activeCount: active.length,

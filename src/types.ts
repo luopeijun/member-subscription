@@ -92,6 +92,24 @@ export type Snapshot = {
   note: string | null
 }
 
+export type JointQuoteItem = {
+  subscriptionId: number
+  serviceName: string
+  planName: string
+  cycleMonths: number
+  amount: number | null
+}
+
+export type JointQuote = {
+  id: number
+  capturedAt: string
+  total: number
+  cycleMonths: number
+  platform: string | null
+  note: string | null
+  items: JointQuoteItem[]
+}
+
 export type Upcoming = {
   subscriptionId: number
   serviceName: string
@@ -123,5 +141,6 @@ export type AppState = {
   payments: Payment[]
   jointRenewals: JointRenewal[]
   snapshots: Snapshot[]
+  jointQuotes: JointQuote[]
   stats: Stats
 }

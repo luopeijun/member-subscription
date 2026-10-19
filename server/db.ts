@@ -77,9 +77,28 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS joint_quotes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    captured_at TEXT NOT NULL,
+    total INTEGER NOT NULL,
+    cycle_months INTEGER NOT NULL DEFAULT 0,
+    platform TEXT,
+    note TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS joint_quote_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    joint_quote_id INTEGER NOT NULL REFERENCES joint_quotes(id) ON DELETE CASCADE,
+    subscription_id INTEGER NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    UNIQUE (joint_quote_id, subscription_id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_payments_sub ON payments(subscription_id, paid_at);
   CREATE INDEX IF NOT EXISTS idx_subs_plan ON subscriptions(plan_id);
   CREATE INDEX IF NOT EXISTS idx_snapshots_plan ON price_snapshots(plan_id, captured_at);
+  CREATE INDEX IF NOT EXISTS idx_joint_quote_items_quote ON joint_quote_items(joint_quote_id);
+  CREATE INDEX IF NOT EXISTS idx_joint_quote_items_sub ON joint_quote_items(subscription_id);
 `)
 
 const subscriptionColumns = db.prepare('PRAGMA table_info(subscriptions)').all() as {
