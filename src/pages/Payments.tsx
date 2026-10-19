@@ -9,8 +9,11 @@ type Props = {
   onDelete: (payment: Payment) => void
 }
 
+const PAGE_SIZE = 8
+
 export function Payments({ state, onAdd, onDelete }: Props) {
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
   const keyword = query.trim().toLowerCase()
 
   const list = useMemo(
@@ -26,6 +29,14 @@ export function Payments({ state, onAdd, onDelete }: Props) {
 
   const total = list.reduce((sum, payment) => sum + payment.amount, 0)
   const average = list.length > 0 ? Math.round(total / list.length) : 0
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = list.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  const changeQuery = (value: string) => {
+    setQuery(value)
+    setPage(1)
+  }
 
   return (
     <div className="stack">
@@ -45,7 +56,7 @@ export function Payments({ state, onAdd, onDelete }: Props) {
           <div className="search-box">
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => changeQuery(event.target.value)}
               placeholder="搜索会员名称"
               aria-label="搜索会员名称"
             />
@@ -70,7 +81,7 @@ export function Payments({ state, onAdd, onDelete }: Props) {
         <div className="card card-pad">
           <EmptyState
             title="还没有支付流水"
-            description="每次续费后记一笔，能从流水里看到涨价和实际年化成本。"
+            description="每次续费后记一笔，能从流水里看到涨价和实际月均成本。"
             action={
               <button
                 className="btn primary"
@@ -95,41 +106,58 @@ export function Payments({ state, onAdd, onDelete }: Props) {
           />
         </div>
       ) : (
-        <div className="card table-card">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>支付日期</th>
-                <th>会员</th>
-                <th className="num">金额</th>
-                <th>备注</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((payment) => (
-                <tr key={payment.id}>
-                  <td className="nowrap">{payment.paidAt}</td>
-                  <td>
-                    <div className="cell-strong">{payment.serviceName}</div>
-                    <div className="cell-sub">{payment.planName}</div>
-                  </td>
-                  <td className="num nowrap">{formatCNY(payment.amount)}</td>
-                  <td className="muted">{payment.note ?? '—'}</td>
-                  <td className="num">
-                    <button className="btn sm danger" onClick={() => onDelete(payment)}>
-                      删除
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="pay-list">
+            <div className="pay-head" aria-hidden="true">
+              <span>支付日期</span>
+              <span>会员</span>
+              <span className="num">金额</span>
+              <span>备注</span>
+              <span />
+            </div>
+            {pageItems.map((payment) => (
+              <div className="pay-row" key={payment.id}>
+                <span className="pay-date nowrap">{payment.paidAt}</span>
+                <div className="pay-member">
+                  <div className="cell-strong">{payment.serviceName}</div>
+                  <div className="cell-sub">{payment.planName}</div>
+                </div>
+                <span className="pay-amount num nowrap">{formatCNY(payment.amount)}</span>
+                <span className="pay-note muted">{payment.note ?? '—'}</span>
+                <span className="pay-actions num">
+                  <button className="btn sm danger" onClick={() => onDelete(payment)}>
+                    删除
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+          {totalPages > 1 ? (
+            <div className="pager">
+              <button
+                className="btn sm"
+                onClick={() => setPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                上一页
+              </button>
+              <span className="pager-info">
+                第 {currentPage} / {totalPages} 页 · 共 {list.length} 笔
+              </span>
+              <button
+                className="btn sm"
+                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+              >
+                下一页
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
 
       <p className="page-note">
-        删除支付记录会改变对应会员的年化成本与累计支出，但不会自动改“下次续费日”。
+        删除支付记录会改变对应会员的月均成本与累计支出，但不会自动改“下次续费日”。
         如果误删了最近一笔，记得在会员编辑里覆盖下次续费日期。
       </p>
     </div>

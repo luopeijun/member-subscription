@@ -168,8 +168,10 @@ export function Subscriptions({ state, onAdd, onEdit, onRenew, onDelete }: Props
                   </small>
                 </div>
                 <div>
-                  <span>年化成本</span>
-                  <strong>{sub.cycleMonths === 0 ? '一次性' : formatCNY(sub.annualized)}</strong>
+                  <span>月均成本</span>
+                  <strong>
+                    {sub.cycleMonths === 0 ? '一次性' : formatCNY(Math.round(sub.annualized / 12))}
+                  </strong>
                   <small>
                     累计 {formatCNY(sub.totalSpent)} · {sub.paymentCount} 笔
                   </small>

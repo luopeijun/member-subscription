@@ -46,9 +46,9 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
     <div className="stack">
       <section className="kpi-grid">
         <div className="card kpi">
-          <span className="kpi-label">年化订阅支出</span>
-          <strong className="kpi-value">{formatCNY(stats.annualized)}</strong>
-          <span className="kpi-sub">月均 {formatCNY(stats.monthly)}</span>
+          <span className="kpi-label">月均订阅支出</span>
+          <strong className="kpi-value">{formatCNY(stats.monthly)}</strong>
+          <span className="kpi-sub">年均 {formatCNY(stats.annualized)}</span>
         </div>
         <div className="card kpi">
           <span className="kpi-label">活跃会员</span>
@@ -117,7 +117,7 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
         <div className="card card-pad">
           <div className="card-head">
             <div>
-              <h2>分类年化</h2>
+              <h2>分类月均</h2>
               <p>只统计活跃会员</p>
             </div>
           </div>
@@ -132,7 +132,7 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
                       {item.category}
                       <small>{item.count} 个</small>
                     </span>
-                    <strong>{formatCNY(item.annualized)}</strong>
+                    <strong>{formatCNY(Math.round(item.annualized / 12))}</strong>
                   </div>
                   <div className="bar-track">
                     <div
@@ -157,15 +157,15 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
         </div>
         <div className="bars">
           {stats.monthlySpend.map((item, index) => (
-            <div
-              className="bar-col"
-              key={item.month}
-              title={`${item.month} · ${formatCNY(item.total)}`}
-            >
+            <div className="bar-col" key={item.month} tabIndex={0}>
               <div
                 className="bar"
                 style={{ height: `${Math.max(4, (item.total / maxMonthly) * 110)}px` }}
-              />
+              >
+                <span className="bar-tip">
+                  {item.month} · {formatCNY(item.total)}
+                </span>
+              </div>
               <span className="bar-label">
                 {index % 2 === 0 || index === stats.monthlySpend.length - 1
                   ? monthLabel(item.month)
