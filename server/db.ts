@@ -63,6 +63,7 @@ db.exec(`
     amount INTEGER NOT NULL,
     note TEXT,
     joint_renewal_id INTEGER REFERENCES joint_renewals(id) ON DELETE CASCADE,
+    duration_days INTEGER,
     created_at TEXT NOT NULL
   );
 
@@ -91,6 +92,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     joint_quote_id INTEGER NOT NULL REFERENCES joint_quotes(id) ON DELETE CASCADE,
     subscription_id INTEGER NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    duration_days INTEGER,
     UNIQUE (joint_quote_id, subscription_id)
   );
 
@@ -243,3 +245,52 @@ if (!snapshotColumns.some((column) => column.name === 'cycle_months')) {
      )`,
   )
 }
+
+// Joint members used to share one bundle-wide cycle. Each member now carries
+// its own duration, always measured in days (a perk can be as short as a few
+// days). Older builds stored a separate month field; fold it in and drop it.
+const durationColumns = db.prepare('PRAGMA table_info(payments)').all() as {
+  name: string
+}[]
+if (durationColumns.some((column) => column.name === 'duration_months')) {
+  db.exec(
+    `UPDATE payments
+     SET duration_days = COALESCE(duration_days, 0) + COALESCE(duration_months, 0) * 30
+     WHERE duration_months IS NOT NULL`,
+  )
+  db.exec('ALTER TABLE payments DROP COLUMN duration_months')
+}
+if (!durationColumns.some((column) => column.name === 'duration_days')) {
+  db.exec('ALTER TABLE payments ADD COLUMN duration_days INTEGER')
+}
+db.exec(
+  `UPDATE payments
+   SET duration_days = COALESCE(
+         (SELECT cycle_months FROM joint_renewals WHERE joint_renewals.id = payments.joint_renewal_id),
+         0
+       ) * 30
+   WHERE joint_renewal_id IS NOT NULL AND duration_days IS NULL`,
+)
+
+const quoteItemDurationColumns = db
+  .prepare('PRAGMA table_info(joint_quote_items)')
+  .all() as { name: string }[]
+if (quoteItemDurationColumns.some((column) => column.name === 'duration_months')) {
+  db.exec(
+    `UPDATE joint_quote_items
+     SET duration_days = COALESCE(duration_days, 0) + COALESCE(duration_months, 0) * 30
+     WHERE duration_months IS NOT NULL`,
+  )
+  db.exec('ALTER TABLE joint_quote_items DROP COLUMN duration_months')
+}
+if (!quoteItemDurationColumns.some((column) => column.name === 'duration_days')) {
+  db.exec('ALTER TABLE joint_quote_items ADD COLUMN duration_days INTEGER')
+}
+db.exec(
+  `UPDATE joint_quote_items
+   SET duration_days = COALESCE(
+         (SELECT cycle_months FROM joint_quotes WHERE joint_quotes.id = joint_quote_items.joint_quote_id),
+         12
+       ) * 30
+   WHERE duration_days IS NULL`,
+)

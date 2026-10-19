@@ -85,12 +85,19 @@ export function exportAll() {
     )
     .all() as { id: number }[]
   const jointQuoteItemRows = db
-    .prepare('SELECT joint_quote_id, subscription_id FROM joint_quote_items ORDER BY id')
-    .all() as { joint_quote_id: number; subscription_id: number }[]
-  const jointQuoteItemsByQuote = new Map<number, number[]>()
+    .prepare(
+      `SELECT joint_quote_id, subscription_id, duration_days
+       FROM joint_quote_items ORDER BY id`,
+    )
+    .all() as {
+    joint_quote_id: number
+    subscription_id: number
+    duration_days: number | null
+  }[]
+  const jointQuoteItemsByQuote = new Map<number, typeof jointQuoteItemRows>()
   for (const item of jointQuoteItemRows) {
     const list = jointQuoteItemsByQuote.get(item.joint_quote_id) ?? []
-    list.push(item.subscription_id)
+    list.push(item)
     jointQuoteItemsByQuote.set(item.joint_quote_id, list)
   }
 
@@ -122,7 +129,8 @@ export function exportAll() {
       .all(),
     payments: db
       .prepare(
-        `SELECT id, subscription_id, paid_at, amount, note, joint_renewal_id, created_at
+        `SELECT id, subscription_id, paid_at, amount, note, joint_renewal_id,
+          duration_days, created_at
          FROM payments ORDER BY id`,
       )
       .all(),
@@ -134,8 +142,9 @@ export function exportAll() {
       .all(),
     jointQuotes: jointQuoteRows.map((quote) => ({
       ...quote,
-      items: (jointQuoteItemsByQuote.get(quote.id) ?? []).map((subscriptionId) => ({
-        subscription_id: subscriptionId,
+      items: (jointQuoteItemsByQuote.get(quote.id) ?? []).map((item) => ({
+        subscription_id: item.subscription_id,
+        duration_days: item.duration_days,
       })),
     })),
   }
@@ -205,8 +214,10 @@ export function importAll(payload: unknown): ImportSummary {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertPayment = db.prepare(
-      `INSERT INTO payments (subscription_id, paid_at, amount, note, joint_renewal_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO payments
+        (subscription_id, paid_at, amount, note, joint_renewal_id,
+         duration_days, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertSnapshot = db.prepare(
       `INSERT INTO price_snapshots (plan_id, captured_at, price, cycle_months, platform, note, created_at)
@@ -217,7 +228,9 @@ export function importAll(payload: unknown): ImportSummary {
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
     const insertJointQuoteItem = db.prepare(
-      'INSERT INTO joint_quote_items (joint_quote_id, subscription_id) VALUES (?, ?)',
+      `INSERT INTO joint_quote_items
+        (joint_quote_id, subscription_id, duration_days)
+       VALUES (?, ?, ?)`,
     )
 
     for (const row of services) {
@@ -317,14 +330,21 @@ export function importAll(payload: unknown): ImportSummary {
       const rawItems = Array.isArray(row.items)
         ? (row.items as Record<string, unknown>[])
         : []
-      const subscriptionIds = new Set<number>()
+      const items: { subscriptionId: number; days: number | null }[] = []
+      const seen = new Set<number>()
       for (const item of rawItems) {
         const subscriptionId = subscriptionMap.get(
           integer(item.subscription_id, '联合报价会员', 1),
         )
-        if (subscriptionId) subscriptionIds.add(subscriptionId)
+        if (!subscriptionId || seen.has(subscriptionId)) continue
+        seen.add(subscriptionId)
+        const days =
+          item.duration_days === null || item.duration_days === undefined
+            ? null
+            : integer(item.duration_days, '联合报价时长（天）', 1, 3650)
+        items.push({ subscriptionId, days })
       }
-      if (subscriptionIds.size === 0) continue
+      if (items.length === 0) continue
 
       const info = insertJointQuote.run(
         date(row.captured_at, '联合报价日期'),
@@ -335,8 +355,8 @@ export function importAll(payload: unknown): ImportSummary {
         createdStamp(row.created_at),
       )
       const quoteId = Number(info.lastInsertRowid)
-      for (const subscriptionId of subscriptionIds) {
-        insertJointQuoteItem.run(quoteId, subscriptionId)
+      for (const item of items) {
+        insertJointQuoteItem.run(quoteId, item.subscriptionId, item.days)
       }
       summary.jointQuotesAdded += 1
     }
@@ -354,12 +374,17 @@ export function importAll(payload: unknown): ImportSummary {
         jointRenewalId =
           jointRenewalMap.get(integer(rawJointRenewalId, '联合续费记录', 1)) ?? null
       }
+      const durationDays =
+        row.duration_days === null || row.duration_days === undefined
+          ? null
+          : integer(row.duration_days, '支付时长（天）', 1, 3650)
       insertPayment.run(
         subscriptionId,
         date(row.paid_at, '支付日期'),
         integer(row.amount, '支付金额', 0),
         optionalText(row.note),
         jointRenewalId,
+        durationDays,
         createdStamp(row.created_at),
       )
       summary.paymentsAdded += 1

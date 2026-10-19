@@ -1,5 +1,6 @@
 import { db } from './db'
 import { addMonths, daysBetween, pad2, todayISO } from './util'
+import { DAYS_PER_MONTH } from '../shared/duration'
 
 type ServiceRow = {
   id: number
@@ -39,6 +40,7 @@ type PaymentRow = {
   amount: number
   note: string | null
   joint_renewal_id: number | null
+  duration_days: number | null
   service_name: string
   plan_name: string
   cycle_months: number
@@ -59,6 +61,7 @@ type JointMemberRow = {
   joint_renewal_id: number
   subscription_id: number
   amount: number
+  duration_days: number | null
   service_name: string
   plan_name: string
 }
@@ -87,9 +90,10 @@ type JointQuoteRow = {
 type JointQuoteItemRow = {
   joint_quote_id: number
   subscription_id: number
+  duration_days: number | null
   service_name: string
   plan_name: string
-  cycle_months: number
+  plan_cycle_months: number
 }
 
 export function buildState() {
@@ -120,7 +124,7 @@ export function buildState() {
   const paymentRows = db
     .prepare(
       `SELECT pay.id, pay.subscription_id, pay.paid_at, pay.amount, pay.note,
-        pay.joint_renewal_id,
+        pay.joint_renewal_id, pay.duration_days,
         s.name AS service_name, pl.name AS plan_name, pl.cycle_months
       FROM payments pay
       JOIN subscriptions sub ON sub.id = pay.subscription_id
@@ -145,6 +149,7 @@ export function buildState() {
   const jointMemberRows = db
     .prepare(
       `SELECT pay.joint_renewal_id, pay.subscription_id, pay.amount,
+        pay.duration_days,
         s.name AS service_name, pl.name AS plan_name
       FROM payments pay
       JOIN subscriptions sub ON sub.id = pay.subscription_id
@@ -184,7 +189,8 @@ export function buildState() {
   const jointQuoteItemRows = db
     .prepare(
       `SELECT jqi.joint_quote_id, jqi.subscription_id,
-        s.name AS service_name, pl.name AS plan_name, pl.cycle_months
+        jqi.duration_days,
+        s.name AS service_name, pl.name AS plan_name, pl.cycle_months AS plan_cycle_months
       FROM joint_quote_items jqi
       JOIN subscriptions sub ON sub.id = jqi.subscription_id
       JOIN plans pl ON pl.id = sub.plan_id
@@ -221,8 +227,15 @@ export function buildState() {
     const nextRenewalAt = sub.next_renewal_override || computedNext
     const daysLeft = nextRenewalAt ? daysBetween(today, nextRenewalAt) : null
 
+    // A joint purchase can hand this member a duration that differs from the
+    // plan's own cycle (e.g. a 1-month perk on an annual plan), so fall back to
+    // the payment's own duration before the plan cycle.
+    const effectiveMonths =
+      last && last.duration_days !== null ? last.duration_days / DAYS_PER_MONTH : cycle
     const annualized =
-      cycle > 0 && last ? Math.round((last.amount * 12) / cycle) : 0
+      effectiveMonths > 0 && last
+        ? Math.round((last.amount * 12) / effectiveMonths)
+        : 0
     const totalSpent = payments.reduce((sum, item) => sum + item.amount, 0)
     const priceChangePct =
       last && prev && prev.amount > 0
@@ -357,6 +370,7 @@ export function buildState() {
         serviceName: member.service_name,
         planName: member.plan_name,
         amount: member.amount,
+        durationDays: member.duration_days ?? renewal.cycle_months * DAYS_PER_MONTH,
       })),
     })),
     snapshots: snapshotRows.map((snapshot) => ({
@@ -380,12 +394,20 @@ export function buildState() {
       items: (jointQuoteItemsByQuote.get(quote.id) ?? []).map((item) => {
         const payments = paymentsBySub.get(item.subscription_id) ?? []
         const latest = payments.at(-1) ?? null
+        const effectiveMonths = latest
+          ? latest.duration_days !== null
+            ? latest.duration_days / DAYS_PER_MONTH
+            : item.plan_cycle_months
+          : 0
         return {
           subscriptionId: item.subscription_id,
           serviceName: item.service_name,
           planName: item.plan_name,
-          cycleMonths: item.cycle_months,
-          amount: latest ? latest.amount : null,
+          durationDays: item.duration_days ?? quote.cycle_months * DAYS_PER_MONTH,
+          monthly:
+            latest && effectiveMonths > 0
+              ? Math.round(latest.amount / effectiveMonths)
+              : null,
         }
       }),
     })),
