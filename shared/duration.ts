@@ -1,5 +1,8 @@
 export const DAYS_PER_YEAR = 365
 
+/** 单次可录入的最长时长，和接口校验保持一致。 */
+export const MAX_DURATION_DAYS = 3650
+
 /** 一个月按 365 / 12 天折算，这样 365 天正好等于 12 个月。 */
 export const DAYS_PER_MONTH = DAYS_PER_YEAR / 12
 
@@ -18,6 +21,17 @@ export function addDaysISO(value: string, days: number): string {
     2,
     '0',
   )}-${String(date.getUTCDate()).padStart(2, '0')}`
+}
+
+/** 两个 YYYY-MM-DD 之间相差的天数，统一按 UTC 计算。 */
+export function daysBetweenISO(from: string, to: string): number {
+  const [fromYear, fromMonth, fromDay] = from.split('-').map(Number)
+  const [toYear, toMonth, toDay] = to.split('-').map(Number)
+  return Math.round(
+    (Date.UTC(toYear, toMonth - 1, toDay) -
+      Date.UTC(fromYear, fromMonth - 1, fromDay)) /
+      86_400_000,
+  )
 }
 
 /** 常见时长的快捷选项，方便一次点选。 */

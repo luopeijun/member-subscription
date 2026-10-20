@@ -3,8 +3,13 @@ import { api } from '@/api'
 import type { AppState, SavedHandler, Subscription } from '@/types'
 import { Modal } from '@/components/Modal/Modal'
 import { toMajor, toMinor } from '@shared/money'
-import { addDaysISO, DURATION_PRESETS } from '@shared/duration'
-import { clampDurationDays } from '@/utils/duration'
+import {
+  addDaysISO,
+  daysBetweenISO,
+  DURATION_PRESETS,
+  MAX_DURATION_DAYS,
+} from '@shared/duration'
+import { formatDate } from '@/utils/format'
 import './PaymentForm.scss'
 
 /* ---------------------------------- 支付表单 --------------------------------- */
@@ -26,38 +31,86 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
   })
   const [paidAt, setPaidAt] = useState(state.today)
   const [durationDays, setDurationDays] = useState('')
+  const [nextRenewalDate, setNextRenewalDate] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const target = state.subscriptions.find((item) => item.id === subId)
+
+  const baseFor = (paymentDate: string) =>
+    target &&
+    target.status !== 'planned' &&
+    target.nextRenewalAt &&
+    target.nextRenewalAt > paymentDate
+      ? target.nextRenewalAt
+      : paymentDate
+
+  const base = paidAt ? baseFor(paidAt) : ''
+
+  const readDuration = (value: string): number | null => {
+    if (value.trim() === '') return null
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed) || parsed < 1) return null
+    return Math.floor(parsed)
+  }
+
+  const duration = readDuration(durationDays)
+  const durationInvalid = durationDays.trim() !== '' && duration === null
+  const durationTooLong = duration !== null && duration > MAX_DURATION_DAYS
+  const dateInvalid =
+    nextRenewalDate !== '' &&
+    base !== '' &&
+    daysBetweenISO(base, nextRenewalDate) < 1
+  const preview =
+    nextRenewalDate ||
+    (duration !== null && base ? addDaysISO(base, duration) : null)
+
   const selectSubscription = (id: number) => {
     setSubId(id)
     setDurationDays('')
-    const target = state.subscriptions.find((item) => item.id === id)
-    if (!target) return
-    if (target.lastPayment) {
-      setAmount(String(toMajor(target.lastPayment.amount)))
-    } else if (target.listPrice) {
-      setAmount(String(toMajor(target.listPrice)))
+    setNextRenewalDate('')
+    const nextTarget = state.subscriptions.find((item) => item.id === id)
+    if (!nextTarget) return
+    if (nextTarget.lastPayment) {
+      setAmount(String(toMajor(nextTarget.lastPayment.amount)))
+    } else if (nextTarget.listPrice) {
+      setAmount(String(toMajor(nextTarget.listPrice)))
     } else {
       setAmount('')
     }
   }
 
-  const target = state.subscriptions.find((item) => item.id === subId)
-  const parsedDuration = Number(durationDays)
-  const duration =
-    durationDays.trim() !== '' && Number.isFinite(parsedDuration)
-      ? clampDurationDays(durationDays)
-      : null
-  const base =
-    target &&
-    target.status !== 'planned' &&
-    target.nextRenewalAt &&
-    target.nextRenewalAt > paidAt
-      ? target.nextRenewalAt
-      : paidAt
-  const preview = duration !== null ? addDaysISO(base, duration) : null
+  const changeDuration = (value: string) => {
+    setDurationDays(value)
+    const days = readDuration(value)
+    setNextRenewalDate(days !== null && base ? addDaysISO(base, days) : '')
+  }
+
+  const changeNextRenewalDate = (value: string) => {
+    setNextRenewalDate(value)
+    if (!value || !base) {
+      setDurationDays('')
+      return
+    }
+    const days = daysBetweenISO(base, value)
+    setDurationDays(days >= 1 ? String(days) : '')
+  }
+
+  const changePaidAt = (value: string) => {
+    setPaidAt(value)
+    if (!value) return
+    const nextBase = baseFor(value)
+    const days = readDuration(durationDays)
+    if (days !== null) {
+      setNextRenewalDate(addDaysISO(nextBase, days))
+      return
+    }
+    if (nextRenewalDate) {
+      const diff = daysBetweenISO(nextBase, nextRenewalDate)
+      setDurationDays(diff >= 1 ? String(diff) : '')
+    }
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -71,11 +124,20 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
       setError('请填写支付金额')
       return
     }
-    if (
-      durationDays.trim() !== '' &&
-      (!Number.isFinite(parsedDuration) || parsedDuration < 1)
-    ) {
+    if (durationInvalid) {
       setError('续费时长至少为 1 天')
+      return
+    }
+    if (durationTooLong) {
+      setError(`续费时长最多为 ${MAX_DURATION_DAYS} 天`)
+      return
+    }
+    if (dateInvalid) {
+      setError('下次续费日需要晚于起算日')
+      return
+    }
+    if (nextRenewalDate && duration === null) {
+      setError('请检查下次续费日')
       return
     }
 
@@ -145,34 +207,61 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
           </div>
           <div className="field">
             <label>支付日期</label>
-            <input type="date" value={paidAt} onChange={(event) => setPaidAt(event.target.value)} />
+            <input
+              type="date"
+              value={paidAt}
+              onChange={(event) => changePaidAt(event.target.value)}
+            />
           </div>
-          <div className="field span-2">
+          <div className="field">
             <label>这次买到的时长（天，选填）</label>
             <input
               type="number"
               min="1"
+              max={MAX_DURATION_DAYS}
               step="1"
               value={durationDays}
-              placeholder="留空则按套餐周期自动推算"
-              onChange={(event) => setDurationDays(event.target.value)}
+              placeholder="留空则按套餐周期"
+              onChange={(event) => changeDuration(event.target.value)}
             />
+          </div>
+          <div className="field">
+            <label>下次续费日（选填）</label>
+            <input
+              type="date"
+              value={nextRenewalDate}
+              min={base ? addDaysISO(base, 1) : undefined}
+              max={base ? addDaysISO(base, MAX_DURATION_DAYS) : undefined}
+              onChange={(event) => changeNextRenewalDate(event.target.value)}
+            />
+          </div>
+          <div className="field span-2">
             <div className="duration-presets">
               {DURATION_PRESETS.map((preset) => (
                 <button
                   key={preset.days}
                   type="button"
                   className="btn sm"
-                  onClick={() => setDurationDays(String(preset.days))}
+                  onClick={() => changeDuration(String(preset.days))}
                 >
                   {preset.label}
                 </button>
               ))}
             </div>
-            <p className="duration-hint">
-              {preview
-                ? `按 ${duration} 天计算，预计下次续费日 ${preview}。`
-                : '留空时按套餐计费周期推算；想买会员记录支付后会自动转为活跃。'}
+            <p
+              className={`duration-hint${
+                durationInvalid || durationTooLong || dateInvalid ? ' error' : ''
+              }`}
+            >
+              {dateInvalid
+                ? `下次续费日需要晚于起算日 ${formatDate(base)}。`
+                : durationTooLong
+                  ? `续费时长最多为 ${MAX_DURATION_DAYS} 天。`
+                  : durationInvalid
+                    ? '续费时长至少为 1 天。'
+                    : preview && duration !== null
+                      ? `${formatDate(base)} 起算，买到 ${duration} 天，下次续费日 ${formatDate(preview)}。`
+                      : '两个框会互相换算；都留空时按套餐计费周期推算。'}
             </p>
           </div>
           <div className="field span-2">
