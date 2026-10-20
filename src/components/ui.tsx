@@ -94,7 +94,7 @@ export function DaysBadge({ days }: { days: number }) {
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const tone = status === 'active' ? 'ok' : status === 'planned' ? 'info' : 'muted'
+  const tone = status === 'active' ? 'ok' : status === 'planned' ? 'info' : 'danger'
   return <span className={`badge ${tone}`}>{statusLabel(status)}</span>
 }
 

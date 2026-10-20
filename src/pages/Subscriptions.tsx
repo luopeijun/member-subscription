@@ -236,7 +236,7 @@ export function Subscriptions({
                     {sub.status === 'active' ? (
                       sub.daysLeft !== null ? <DaysBadge days={sub.daysLeft} /> : null
                     ) : sub.daysLeft !== null && sub.daysLeft < 0 ? (
-                      <span className="badge muted">
+                      <span className="badge danger">
                         已过期 {Math.abs(sub.daysLeft)} 天
                       </span>
                     ) : null}
