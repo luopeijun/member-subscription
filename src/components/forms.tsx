@@ -37,7 +37,6 @@ type SubFormState = {
   autoRenew: boolean
   status: string
   nextRenewalOverride: string
-  sharedWith: string
   note: string
   paidAt: string
   amount: string
@@ -66,7 +65,6 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
         autoRenew: editing.autoRenew,
         status: editing.status,
         nextRenewalOverride: editing.nextRenewalOverride ?? '',
-        sharedWith: editing.sharedWith ?? '',
         note: editing.note ?? '',
         paidAt: state.today,
         amount: '',
@@ -85,7 +83,6 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
       autoRenew: false,
       status: 'active',
       nextRenewalOverride: '',
-      sharedWith: '',
       note: '',
       paidAt: state.today,
       amount: '',
@@ -153,7 +150,6 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
             autoRenew: form.autoRenew,
             status: form.status,
             nextRenewalOverride: form.nextRenewalOverride || null,
-            sharedWith: form.sharedWith.trim() || null,
             note: form.note.trim() || null,
           }),
         })
@@ -172,7 +168,6 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
             nextRenewalOverride: form.nextRenewalOverride || null,
             autoRenew: form.autoRenew,
             status: form.status,
-            sharedWith: form.sharedWith.trim() || null,
             note: form.note.trim() || null,
             ...(planned
               ? {}
@@ -360,14 +355,6 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
               />
             </div>
           ) : null}
-          <div className="field">
-            <label>合租 / 共享备注</label>
-            <input
-              value={form.sharedWith}
-              placeholder="选填，例如：3 人合租"
-              onChange={(event) => patch({ sharedWith: event.target.value })}
-            />
-          </div>
           {!planned ? (
             <div className="field">
               <label>自动续费</label>

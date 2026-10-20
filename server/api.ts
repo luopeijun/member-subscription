@@ -163,7 +163,6 @@ function getSubscription(id: number) {
         next_renewal_override: string | null
         auto_renew: number
         status: string
-        shared_with: string | null
         note: string | null
       }
     | undefined
@@ -236,7 +235,6 @@ apiRouter.post(
     const startedAt = date(body.startedAt, '开始日期')
     const nextRenewalOverride = maybeDate(body.nextRenewalOverride, '下次续费日期')
     const subscriptionStatus = status(body.status ?? 'active')
-    const sharedWith = optionalText(body.sharedWith, 120)
     const note = optionalText(body.note, 300)
     const autoRenew = body.autoRenew === true
 
@@ -259,8 +257,8 @@ apiRouter.post(
       const subInfo = db
         .prepare(
           `INSERT INTO subscriptions
-            (plan_id, platform, account, started_at, next_renewal_override, auto_renew, status, shared_with, note, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (plan_id, platform, account, started_at, next_renewal_override, auto_renew, status, note, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           planId,
@@ -270,7 +268,6 @@ apiRouter.post(
           nextRenewalOverride,
           autoRenew ? 1 : 0,
           subscriptionStatus,
-          sharedWith,
           note,
           nowISO(),
         )
@@ -325,7 +322,7 @@ apiRouter.put(
       ).run(planName, cycleMonths, listPrice, planRow.id)
       db.prepare(
         `UPDATE subscriptions
-         SET platform = ?, account = ?, started_at = ?, next_renewal_override = ?, auto_renew = ?, status = ?, shared_with = ?, note = ?
+         SET platform = ?, account = ?, started_at = ?, next_renewal_override = ?, auto_renew = ?, status = ?, note = ?
          WHERE id = ?`,
       ).run(
         optionalText(body.platform, 60),
@@ -334,7 +331,6 @@ apiRouter.put(
         nextRenewalOverride,
         autoRenew ? 1 : 0,
         subscriptionStatus,
-        optionalText(body.sharedWith, 120),
         optionalText(body.note, 300),
         id,
       )

@@ -93,8 +93,8 @@ export function seedDemoData() {
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
   const insertSub = db.prepare(
-    `INSERT INTO subscriptions (plan_id, platform, account, started_at, auto_renew, status, shared_with, note, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO subscriptions (plan_id, platform, account, started_at, auto_renew, status, note, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   )
   const insertPayment = db.prepare(
     `INSERT INTO payments (subscription_id, paid_at, amount, note, created_at)
@@ -118,7 +118,6 @@ export function seedDemoData() {
           start,
           1,
           'active',
-          null,
           item.note ?? null,
           now,
         ).lastInsertRowid,

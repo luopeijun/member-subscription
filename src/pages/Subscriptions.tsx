@@ -50,7 +50,6 @@ export function Subscriptions({
         sub.serviceName,
         sub.planName,
         sub.platform,
-        sub.sharedWith,
         sub.account,
         sub.note,
       ].some((value) => Boolean(value && value.toLowerCase().includes(keyword)))
@@ -169,7 +168,6 @@ export function Subscriptions({
                 ) : (
                   <span className="badge muted">手动续费</span>
                 )}
-                {sub.sharedWith ? <span className="badge muted">{sub.sharedWith}</span> : null}
                 {sub.note ? <span className="badge muted">{sub.note}</span> : null}
               </div>
 

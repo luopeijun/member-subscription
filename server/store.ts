@@ -29,7 +29,6 @@ type SubRow = {
   next_renewal_override: string | null
   auto_renew: number
   status: string
-  shared_with: string | null
   note: string | null
 }
 
@@ -266,7 +265,6 @@ export function buildState() {
       nextRenewalOverride: sub.next_renewal_override,
       autoRenew: Boolean(sub.auto_renew),
       status,
-      sharedWith: sub.shared_with,
       note: sub.note,
       lastPayment: last
         ? { id: last.id, paidAt: last.paid_at, amount: last.amount }

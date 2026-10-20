@@ -40,7 +40,6 @@ db.exec(`
     next_renewal_override TEXT,
     auto_renew INTEGER NOT NULL DEFAULT 1,
     status TEXT NOT NULL DEFAULT 'active',
-    shared_with TEXT,
     note TEXT,
     created_at TEXT NOT NULL
   );
@@ -109,6 +108,24 @@ const subscriptionColumns = db.prepare('PRAGMA table_info(subscriptions)').all()
 const paymentColumns = db.prepare('PRAGMA table_info(payments)').all() as {
   name: string
 }[]
+
+// 合租备注已并入普通备注字段；先把旧数据搬过去，再删掉多余的列。
+if (subscriptionColumns.some((column) => column.name === 'shared_with')) {
+  db.exec(
+    `UPDATE subscriptions
+     SET note = CASE
+       WHEN note IS NULL OR TRIM(note) = '' THEN shared_with
+       ELSE note || ' · ' || shared_with
+     END
+     WHERE shared_with IS NOT NULL AND TRIM(shared_with) <> ''`,
+  )
+  try {
+    db.exec('ALTER TABLE subscriptions DROP COLUMN shared_with')
+  } catch {
+    // Older SQLite builds may not support DROP COLUMN; the column is unused.
+    db.exec('UPDATE subscriptions SET shared_with = NULL')
+  }
+}
 
 if (!paymentColumns.some((column) => column.name === 'joint_renewal_id')) {
   db.exec(

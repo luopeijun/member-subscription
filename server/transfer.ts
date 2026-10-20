@@ -117,7 +117,7 @@ export function exportAll() {
     subscriptions: db
       .prepare(
         `SELECT id, plan_id, platform, account, started_at, next_renewal_override,
-          auto_renew, status, shared_with, note, created_at
+          auto_renew, status, note, created_at
          FROM subscriptions ORDER BY id`,
       )
       .all(),
@@ -206,8 +206,8 @@ export function importAll(payload: unknown): ImportSummary {
     const insertSubscription = db.prepare(
       `INSERT INTO subscriptions
         (plan_id, platform, account, started_at, next_renewal_override,
-         auto_renew, status, shared_with, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         auto_renew, status, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertJointRenewal = db.prepare(
       `INSERT INTO joint_renewals
@@ -288,6 +288,10 @@ export function importAll(payload: unknown): ImportSummary {
       }
       const autoRenew =
         row.auto_renew === true || row.auto_renew === 1 || row.auto_renew === '1' ? 1 : 0
+      // 旧备份把合租信息存在单独字段里，导入时并入备注。
+      const noteParts = [optionalText(row.note), optionalText(row.shared_with, 120)].filter(
+        (part): part is string => Boolean(part),
+      )
       const info = insertSubscription.run(
         planId,
         optionalText(row.platform, 60),
@@ -296,8 +300,7 @@ export function importAll(payload: unknown): ImportSummary {
         nullableDate(row.next_renewal_override, '下次续费日期'),
         autoRenew,
         normalizeStatus(row.status),
-        optionalText(row.shared_with, 120),
-        optionalText(row.note),
+        noteParts.length > 0 ? noteParts.join(' · ') : null,
         createdStamp(row.created_at),
       )
       subscriptionMap.set(oldId, Number(info.lastInsertRowid))

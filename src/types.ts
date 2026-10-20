@@ -58,7 +58,6 @@ export type Subscription = {
   nextRenewalOverride: string | null
   autoRenew: boolean
   status: string
-  sharedWith: string | null
   note: string | null
   lastPayment: PaymentLite | null
   prevPayment: PaymentLite | null
