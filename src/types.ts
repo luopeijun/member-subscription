@@ -144,3 +144,5 @@ export type AppState = {
   jointQuotes: JointQuote[]
   stats: Stats
 }
+
+export type SavedHandler = (next: AppState, message: string) => void

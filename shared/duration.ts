@@ -9,10 +9,21 @@ export function formatDuration(days: number): string {
   return `${days} 天`
 }
 
+/** 在 YYYY-MM-DD 上加减天数，统一按 UTC 计算，避免时区误差。 */
+export function addDaysISO(value: string, days: number): string {
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  date.setUTCDate(date.getUTCDate() + days)
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+    2,
+    '0',
+  )}-${String(date.getUTCDate()).padStart(2, '0')}`
+}
+
 /** 常见时长的快捷选项，方便一次点选。 */
 export const DURATION_PRESETS: { days: number; label: string }[] = [
   { days: 1, label: '1 天' },
-  { days: 7, label: '7 天' },
+  { days: 7, label: '1 周' },
   { days: 30, label: '1 个月' },
   { days: 90, label: '3 个月' },
   { days: 180, label: '6 个月' },

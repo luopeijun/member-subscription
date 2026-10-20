@@ -1,0 +1,131 @@
+.joint-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.joint-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.joint-add-row select {
+  flex: 1;
+}
+
+.joint-add-row .btn,
+.joint-member .btn {
+  flex: none;
+}
+
+.joint-members {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.joint-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.joint-member:hover {
+  border-color: #c9cde0;
+}
+
+.joint-member.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.joint-member.picked {
+  cursor: default;
+}
+
+.joint-member input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.joint-member-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.joint-member-main strong {
+  font-size: 13px;
+}
+
+.joint-member-main span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.joint-member-cost {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.joint-member-duration,
+.duration-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.joint-member-duration input,
+.duration-input input {
+  width: 52px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 12px;
+  text-align: center;
+}
+
+.joint-member-duration input:focus,
+.duration-input input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.duration-input .btn {
+  margin-left: 4px;
+}
+
+.duration-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}

@@ -1,18 +1,20 @@
 import { useMemo, useState } from 'react'
-import type { AppState, JointRenewal, Payment } from '../types'
-import { formatCNY } from '../../shared/money'
-import { formatDuration } from '../../shared/duration'
-import { EmptyState, formatDate } from '../components/ui'
-import { Pagination } from '../components/Pagination'
+import type { AppState, JointRenewal, Payment } from '../../types'
+import { formatCNY } from '../../../shared/money'
+import { formatDuration } from '../../../shared/duration'
+import { EmptyState } from '../../components/EmptyState/EmptyState'
+import { Pagination } from '../../components/Pagination/Pagination'
+import { formatDate } from '../../lib/format'
+import './Payments.scss'
 
-type Props = {
+type PaymentsProps = {
   state: AppState
   onAdd: () => void
   onDelete: (payment: Payment) => void
   onDeleteJointRenewal: (jointRenewal: JointRenewal) => void
 }
 
-export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Props) {
+export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: PaymentsProps) {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)

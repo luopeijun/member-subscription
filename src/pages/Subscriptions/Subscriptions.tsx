@@ -1,15 +1,13 @@
 import { useMemo, useState } from 'react'
-import type { AppState, Subscription } from '../types'
-import { formatCNY } from '../../shared/money'
-import {
-  DaysBadge,
-  EmptyState,
-  StatusBadge,
-  cycleLabel,
-  formatDate,
-} from '../components/ui'
+import type { AppState, Subscription } from '../../types'
+import { formatCNY } from '../../../shared/money'
+import { DaysBadge, StatusBadge } from '../../components/Badge/Badge'
+import { EmptyState } from '../../components/EmptyState/EmptyState'
+import { cycleLabel } from '../../lib/cycle'
+import { formatDate } from '../../lib/format'
+import './Subscriptions.scss'
 
-type Props = {
+type SubscriptionsProps = {
   state: AppState
   onAdd: () => void
   onJointRenew: () => void
@@ -36,7 +34,7 @@ export function Subscriptions({
   onEdit,
   onRenew,
   onDelete,
-}: Props) {
+}: SubscriptionsProps) {
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
 

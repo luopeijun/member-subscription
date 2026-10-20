@@ -1,4 +1,6 @@
-type Props = {
+import './Pagination.scss'
+
+type PaginationProps = {
   page: number
   pageSize: number
   total: number
@@ -14,7 +16,7 @@ export function Pagination({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [5, 10, 20, 50],
-}: Props) {
+}: PaginationProps) {
   if (total === 0) return null
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))

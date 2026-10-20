@@ -1,30 +1,17 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { api } from '../api'
-import type { AppState, JointCostMode, Subscription } from '../types'
-import { formatCNY, toMinor } from '../../shared/money'
-import { DURATION_PRESETS, formatDuration } from '../../shared/duration'
-import { Modal, formatDate } from './ui'
+import { api } from '../../api'
+import type { AppState, JointCostMode, SavedHandler, Subscription } from '../../types'
+import { formatCNY, toMinor } from '../../../shared/money'
+import { addDaysISO, DURATION_PRESETS, formatDuration } from '../../../shared/duration'
+import { clampDurationDays } from '../../lib/duration'
+import { Modal } from '../Modal/Modal'
+import { formatDate } from '../../lib/format'
+import './JointRenewForm.scss'
 
-function addDays(value: string, days: number): string {
-  const [year, month, day] = value.split('-').map(Number)
-  const base = new Date(Date.UTC(year, month - 1, day))
-  base.setUTCDate(base.getUTCDate() + days)
-  return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(
-    2,
-    '0',
-  )}-${String(base.getUTCDate()).padStart(2, '0')}`
-}
-
-function clampDays(value: string): number {
-  const parsed = Math.floor(Number(value))
-  if (!Number.isFinite(parsed)) return 1
-  return Math.min(3650, Math.max(1, parsed))
-}
-
-type Props = {
+type JointRenewFormProps = {
   state: AppState
   onClose: () => void
-  onSaved: (next: AppState, message: string) => void
+  onSaved: SavedHandler
 }
 
 type MemberDraft = {
@@ -32,7 +19,7 @@ type MemberDraft = {
   days: number
 }
 
-export function JointRenewForm({ state, onClose, onSaved }: Props) {
+export function JointRenewForm({ state, onClose, onSaved }: JointRenewFormProps) {
   const [members, setMembers] = useState<MemberDraft[]>([])
   const [mainId, setMainId] = useState<number | null>(null)
   const [picker, setPicker] = useState('')
@@ -189,7 +176,7 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
             <div className="joint-members">
               {selectedMembers.map((member, index) => {
                 const isMain = member.id === mainId
-                const nextDate = addDays(
+                const nextDate = addDaysISO(
                   member.sub.nextRenewalAt ?? paidAt,
                   member.days,
                 )
@@ -222,7 +209,7 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
                         value={member.days}
                         aria-label={`${member.sub.serviceName} 时长（天）`}
                         onChange={(event) =>
-                          updateMember(member.id, clampDays(event.target.value))
+                          updateMember(member.id, clampDurationDays(event.target.value))
                         }
                       />
                       <span>天</span>
@@ -271,7 +258,7 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
                 max={3650}
                 value={defaultDays}
                 aria-label="默认天数"
-                onChange={(event) => setDefaultDays(clampDays(event.target.value))}
+                onChange={(event) => setDefaultDays(clampDurationDays(event.target.value))}
               />
               <span>天</span>
               <button

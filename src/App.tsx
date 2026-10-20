@@ -9,19 +9,19 @@ import type {
   Snapshot,
   Subscription,
 } from './types'
-import { Dashboard } from './pages/Dashboard'
-import { Subscriptions } from './pages/Subscriptions'
-import { Payments } from './pages/Payments'
-import { Compare } from './pages/Compare'
-import {
-  JointQuoteForm,
-  PaymentForm,
-  PlanForm,
-  SnapshotForm,
-  SubscriptionForm,
-} from './components/forms'
-import { JointRenewForm } from './components/JointRenewForm'
-import { ConfirmDialog } from './components/ui'
+import { Dashboard } from './pages/Dashboard/Dashboard'
+import { Subscriptions } from './pages/Subscriptions/Subscriptions'
+import { Payments } from './pages/Payments/Payments'
+import { Compare } from './pages/Compare/Compare'
+import { SubscriptionForm } from './components/SubscriptionForm/SubscriptionForm'
+import { PaymentForm } from './components/PaymentForm/PaymentForm'
+import { SnapshotForm } from './components/SnapshotForm/SnapshotForm'
+import { PlanForm } from './components/PlanForm/PlanForm'
+import { JointQuoteForm } from './components/JointQuoteForm/JointQuoteForm'
+import { JointRenewForm } from './components/JointRenewForm/JointRenewForm'
+import { ConfirmDialog } from './components/ConfirmDialog/ConfirmDialog'
+import { Toast, type ToastKind } from './components/Toast/Toast'
+import './App.scss'
 
 type Tab = 'dashboard' | 'subscriptions' | 'payments' | 'compare'
 
@@ -74,7 +74,7 @@ type ModalState =
   | { kind: 'jointQuote' }
   | null
 
-type Toast = { message: string; kind: 'ok' | 'err' }
+type ToastState = { message: string; kind: ToastKind }
 
 type ImportSummary = {
   servicesAdded: number
@@ -91,7 +91,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>(storedTab)
   const [modal, setModal] = useState<ModalState>(null)
-  const [toast, setToast] = useState<Toast | null>(null)
+  const [toast, setToast] = useState<ToastState | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
   const [resetAck, setResetAck] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -124,7 +124,7 @@ export default function App() {
     }
   }, [tab])
 
-  const notify = (message: string, kind: Toast['kind'] = 'ok') => {
+  const notify = (message: string, kind: ToastKind = 'ok') => {
     setToast({ message, kind })
   }
 
@@ -541,7 +541,7 @@ export default function App() {
         </ConfirmDialog>
       ) : null}
 
-      {toast ? <div className={`toast ${toast.kind}`}>{toast.message}</div> : null}
+      {toast ? <Toast message={toast.message} kind={toast.kind} /> : null}
     </div>
   )
 }

@@ -1,0 +1,152 @@
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.tag-row.tight {
+  margin: 4px 0 0;
+}
+
+.sub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+}
+
+.sub-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+@media (hover: hover) {
+  .sub-card:hover {
+    transform: translateY(-3px);
+    border-color: #d8deea;
+    box-shadow:
+      0 14px 30px rgba(17, 24, 39, 0.09),
+      0 3px 8px rgba(17, 24, 39, 0.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sub-card {
+    transition: none;
+  }
+
+  .sub-card:hover {
+    transform: none;
+  }
+}
+
+.sub-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sub-head h3 {
+  font-size: 16px;
+  letter-spacing: -0.2px;
+}
+
+.sub-head p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.sub-price {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: #f8f9fc;
+  border: 1px solid #f0f2f6;
+  border-radius: 10px;
+  padding: 11px 12px;
+}
+
+.sub-price > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sub-price span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sub-price strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.sub-price small {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.price-change {
+  font-size: 11.5px;
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.price-change.up {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.price-change.down {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.sub-renewal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px dashed var(--line);
+  padding-top: 11px;
+}
+
+.sub-renewal > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.sub-renewal span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sub-renewal strong {
+  font-size: 13px;
+}
+
+.sub-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+@media (max-width: 560px) {
+  .sub-grid {
+    grid-template-columns: 1fr;
+  }
+}
