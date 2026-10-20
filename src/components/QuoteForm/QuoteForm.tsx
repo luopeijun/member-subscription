@@ -157,7 +157,7 @@ export function QuoteForm({ state, plan, onClose, onSaved }: QuoteFormProps) {
           </div>
         </div>
 
-        <FormSectionTitle title="报价信息" hint="平台价格和到手时长" />
+        <FormSectionTitle title="报价信息" hint="平台价格与套餐总时长" />
         <QuoteFields
           value={quote}
           onChange={patchQuote}
@@ -165,7 +165,7 @@ export function QuoteForm({ state, plan, onClose, onSaved }: QuoteFormProps) {
         />
 
         <div className="field" style={{ marginTop: 12 }}>
-          <label>怎么买 / 备注</label>
+          <label>购买方式 / 备注</label>
           <input
             value={note}
             placeholder="例如：代充，需要提供账号；合租 3 人车位；新用户首月价"

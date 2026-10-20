@@ -77,12 +77,12 @@ export function ComparePlan({
           ) : null}
         </div>
       ) : (
-        <div className="my-purchase empty-my">我没有买这个套餐，下面是我看过的报价。</div>
+        <div className="my-purchase empty-my">当前未购买该套餐，以下为已录入的平台报价。</div>
       )}
 
       {offers.length === 0 ? (
         <p className="offer-empty muted">
-          还没有录入其他平台的价格。点「记录平台报价」把看到的价格和购买方式记下来。
+          还没有录入其他平台报价。点击「记录平台报价」录入平台价格与购买方式。
         </p>
       ) : (
         <div className="offer-list">
@@ -93,7 +93,7 @@ export function ComparePlan({
             <span>对比我的</span>
             <span>记录日期</span>
             <span>总时长</span>
-            <span>怎么买</span>
+            <span>购买方式 / 备注</span>
             <span />
           </div>
           {offers.map((offer) => (

@@ -68,14 +68,13 @@ export function Compare({
       </div>
 
       <p className="page-note">
-        每个套餐下面，上面一行是<strong>你当前购买的平台和价格</strong>，
-        下面是我录入的其他平台报价。差价按<strong>等效月成本</strong>计算（年付 ÷ 12）；
-        报价包含套餐总时长时，按总时长折算月成本。
-        第一次记录某个套餐时，直接点右上角<strong>「记录平台报价」</strong>，
-        套餐会跟着第一条报价一起创建；之后在套餐上点同一个按钮就是追加报价。
-        合租、代充、需要额外条件的情况写在「怎么买」里。
-        捆绑装则记成<strong>联合报价</strong>，按每个会员各自拿到的天数算出当前组合要花多少钱，
-        再和捆绑包总价对比。
+        每个套餐展示<strong>当前购买的平台与价格</strong>，以及已录入的其他平台报价。
+        差价按<strong>等效月成本</strong>计算：年付按 12 个月折算；报价填写套餐总时长时，
+        按总时长折算月成本。首次记录套餐时，点击右上角<strong>「记录平台报价」</strong>
+        会同时创建套餐；后续在同一套餐上点击该按钮可继续追加报价。
+        合租、代充、需要额外条件的情况，填写在「购买方式 / 备注」中。
+        捆绑购买记录为<strong>联合报价</strong>，按各会员实际获得的时长计算当前组合成本，
+        再与捆绑包总价对比。
       </p>
 
       {state.jointQuotes.length > 0 ? (
@@ -83,7 +82,7 @@ export function Compare({
           <div className="card-head">
             <div>
               <h2>联合报价</h2>
-              <p>一次买多个会员的总价，对比同样时长下当前组合要花的钱</p>
+              <p>一次购买多个会员的捆绑总价，与相同服务时长下的当前组合成本对比</p>
             </div>
           </div>
           <div className="joint-quote-list">
@@ -113,7 +112,7 @@ export function Compare({
           ) : (
             <EmptyState
               title="还没有可比较的套餐"
-              description="点「记录平台报价」录入同一服务的不同套餐或不同价格档位，保存后就能看到换平台是否划算。"
+              description="点击「记录平台报价」录入同一服务的不同套餐或价格档位，保存后可对比不同平台的等效月成本。"
               action={
                 <button className="btn primary" onClick={onNewQuote}>
                   记录平台报价
