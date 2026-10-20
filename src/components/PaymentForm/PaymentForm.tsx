@@ -261,7 +261,7 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
                     ? '续费时长至少为 1 天。'
                     : preview && duration !== null
                       ? `${formatDate(base)} 起算，买到 ${duration} 天，下次续费日 ${formatDate(preview)}。`
-                      : '两个框会互相换算；都留空时按套餐计费周期推算。'}
+                      : '时长和下次续费日会进行互相换算。留空时按套餐计费周期推算。'}
             </p>
           </div>
           <div className="field span-2">
