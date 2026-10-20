@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { AppState, Subscription } from '@/types'
+import { CATEGORIES } from '@/constants'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import { SearchBox } from '@/components/SearchBox/SearchBox'
 import { sortSubscriptions, subscriptionMatchesQuery } from '@/utils/subscription'
@@ -33,18 +34,54 @@ export function Subscriptions({
   onDelete,
 }: SubscriptionsProps) {
   const [filter, setFilter] = useState<Filter>('all')
+  const [category, setCategory] = useState('all')
   const [query, setQuery] = useState('')
 
   const keyword = query.trim().toLowerCase()
 
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const sub of state.subscriptions) {
+      counts.set(sub.category, (counts.get(sub.category) ?? 0) + 1)
+    }
+
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => {
+        const aIndex = CATEGORIES.indexOf(a.name)
+        const bIndex = CATEGORIES.indexOf(b.name)
+        if (aIndex === -1 && bIndex === -1) {
+          return a.name.localeCompare(b.name, 'zh-CN')
+        }
+        if (aIndex === -1) return 1
+        if (bIndex === -1) return -1
+        return aIndex - bIndex
+      })
+  }, [state.subscriptions])
+
+  const categoryScoped = useMemo(
+    () =>
+      category === 'all'
+        ? state.subscriptions
+        : state.subscriptions.filter((sub) => sub.category === category),
+    [state.subscriptions, category],
+  )
+
   const list = useMemo(() => {
-    const filtered = state.subscriptions.filter((sub) => {
+    const filtered = categoryScoped.filter((sub) => {
       if (filter !== 'all' && sub.status !== filter) return false
       return subscriptionMatchesQuery(sub, keyword)
     })
 
     return [...filtered].sort(sortSubscriptions)
-  }, [state.subscriptions, filter, keyword])
+  }, [categoryScoped, filter, keyword])
+
+  const hasFilter = filter !== 'all' || category !== 'all'
+  const clearFilters = () => {
+    setFilter('all')
+    setCategory('all')
+    setQuery('')
+  }
 
   return (
     <div className="stack">
@@ -53,8 +90,8 @@ export function Subscriptions({
           {FILTERS.map((item) => {
             const count =
               item.value === 'all'
-                ? state.subscriptions.length
-                : state.subscriptions.filter((sub) => sub.status === item.value).length
+                ? categoryScoped.length
+                : categoryScoped.filter((sub) => sub.status === item.value).length
             return (
               <button
                 key={item.value}
@@ -68,6 +105,19 @@ export function Subscriptions({
           })}
         </div>
         <div className="toolbar-right">
+          <select
+            className="toolbar-select"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            aria-label="按类别筛选"
+          >
+            <option value="all">全部类别</option>
+            {categoryOptions.map((item) => (
+              <option key={item.name} value={item.name}>
+                {item.name}（{item.count}）
+              </option>
+            ))}
+          </select>
           <SearchBox
             value={query}
             onChange={setQuery}
@@ -88,27 +138,31 @@ export function Subscriptions({
             title={
               keyword
                 ? '没有找到匹配的会员'
-                : filter === 'all'
-                  ? '还没有会员记录'
-                  : '这个状态下没有记录'
+                : filter !== 'all'
+                  ? category !== 'all'
+                    ? '当前类别下没有该状态的会员'
+                    : '这个状态下没有记录'
+                  : category !== 'all'
+                    ? '这个类别下没有会员'
+                    : '还没有会员记录'
             }
             description={
               keyword
                 ? `名称、平台或备注里没有包含「${query.trim()}」的记录。`
-                : filter === 'all'
-                  ? '添加会员时顺手记录一次实际支付，后续每次续费再补一笔，统计就会自动滚起来。'
-                  : '切换筛选条件看看。'
+                : filter !== 'all' || category !== 'all'
+                  ? '换个类别或状态看看。'
+                  : '添加会员时顺手记录一次实际支付，后续每次续费再补一笔，统计就会自动滚起来。'
             }
             action={
-              keyword ? (
-                <button className="btn" onClick={() => setQuery('')}>
-                  清除搜索
+              keyword || hasFilter ? (
+                <button className="btn" onClick={clearFilters}>
+                  清除筛选
                 </button>
-              ) : filter === 'all' ? (
+              ) : (
                 <button className="btn primary" onClick={onAdd}>
                   添加会员
                 </button>
-              ) : undefined
+              )
             }
           />
         </div>

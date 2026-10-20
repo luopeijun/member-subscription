@@ -34,6 +34,7 @@ export const CATEGORIES = [
   '会员权益',
   '教育学习',
   '游戏',
+  '饮食',
   '其他',
 ]
 
