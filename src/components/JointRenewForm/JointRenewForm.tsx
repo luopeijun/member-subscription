@@ -1,11 +1,11 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { api } from '../../api'
-import type { AppState, JointCostMode, SavedHandler, Subscription } from '../../types'
-import { formatCNY, toMinor } from '../../../shared/money'
-import { addDaysISO, DURATION_PRESETS, formatDuration } from '../../../shared/duration'
-import { clampDurationDays } from '../../lib/duration'
-import { Modal } from '../Modal/Modal'
-import { formatDate } from '../../lib/format'
+import { api } from '@/api'
+import type { AppState, JointCostMode, SavedHandler, Subscription } from '@/types'
+import { formatCNY, toMinor } from '@shared/money'
+import { addDaysISO, DURATION_PRESETS, formatDuration } from '@shared/duration'
+import { clampDurationDays } from '@/utils/duration'
+import { Modal } from '@/components/Modal/Modal'
+import { formatDate } from '@/utils/format'
 import './JointRenewForm.scss'
 
 type JointRenewFormProps = {

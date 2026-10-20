@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { api } from './api'
+import { api } from '@/api'
 import type {
   AppState,
   JointQuote,
@@ -8,19 +8,19 @@ import type {
   Plan,
   Snapshot,
   Subscription,
-} from './types'
-import { Dashboard } from './pages/Dashboard/Dashboard'
-import { Subscriptions } from './pages/Subscriptions/Subscriptions'
-import { Payments } from './pages/Payments/Payments'
-import { Compare } from './pages/Compare/Compare'
-import { SubscriptionForm } from './components/SubscriptionForm/SubscriptionForm'
-import { PaymentForm } from './components/PaymentForm/PaymentForm'
-import { SnapshotForm } from './components/SnapshotForm/SnapshotForm'
-import { PlanForm } from './components/PlanForm/PlanForm'
-import { JointQuoteForm } from './components/JointQuoteForm/JointQuoteForm'
-import { JointRenewForm } from './components/JointRenewForm/JointRenewForm'
-import { ConfirmDialog } from './components/ConfirmDialog/ConfirmDialog'
-import { Toast, type ToastKind } from './components/Toast/Toast'
+} from '@/types'
+import { Dashboard } from '@/pages/Dashboard/Dashboard'
+import { Subscriptions } from '@/pages/Subscriptions/Subscriptions'
+import { Payments } from '@/pages/Payments/Payments'
+import { Compare } from '@/pages/Compare/Compare'
+import { SubscriptionForm } from '@/components/SubscriptionForm/SubscriptionForm'
+import { PaymentForm } from '@/components/PaymentForm/PaymentForm'
+import { SnapshotForm } from '@/components/SnapshotForm/SnapshotForm'
+import { PlanForm } from '@/components/PlanForm/PlanForm'
+import { JointQuoteForm } from '@/components/JointQuoteForm/JointQuoteForm'
+import { JointRenewForm } from '@/components/JointRenewForm/JointRenewForm'
+import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog'
+import { Toast, type ToastKind } from '@/components/Toast/Toast'
 import './App.scss'
 
 type Tab = 'dashboard' | 'subscriptions' | 'payments' | 'compare'

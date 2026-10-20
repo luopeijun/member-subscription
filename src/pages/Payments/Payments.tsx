@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import type { AppState, JointRenewal, Payment } from '../../types'
-import { formatCNY } from '../../../shared/money'
-import { formatDuration } from '../../../shared/duration'
-import { EmptyState } from '../../components/EmptyState/EmptyState'
-import { Pagination } from '../../components/Pagination/Pagination'
-import { formatDate } from '../../lib/format'
+import type { AppState, JointRenewal, Payment } from '@/types'
+import { formatCNY } from '@shared/money'
+import { formatDuration } from '@shared/duration'
+import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { Pagination } from '@/components/Pagination/Pagination'
+import { formatDate } from '@/utils/format'
 import './Payments.scss'
 
 type PaymentsProps = {

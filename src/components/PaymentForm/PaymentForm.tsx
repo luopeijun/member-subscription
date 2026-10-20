@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { api } from '../../api'
-import type { AppState, SavedHandler, Subscription } from '../../types'
-import { Modal } from '../Modal/Modal'
-import { toMajor, toMinor } from '../../../shared/money'
+import { api } from '@/api'
+import type { AppState, SavedHandler, Subscription } from '@/types'
+import { Modal } from '@/components/Modal/Modal'
+import { toMajor, toMinor } from '@shared/money'
 
 /* ---------------------------------- 支付表单 --------------------------------- */
 

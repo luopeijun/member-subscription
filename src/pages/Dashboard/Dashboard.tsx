@@ -1,8 +1,8 @@
-import type { AppState, Subscription } from '../../types'
-import { formatCNY } from '../../../shared/money'
-import { DaysBadge } from '../../components/Badge/Badge'
-import { EmptyState } from '../../components/EmptyState/EmptyState'
-import { monthLabel } from '../../lib/format'
+import type { AppState, Subscription } from '@/types'
+import { formatCNY } from '@shared/money'
+import { DaysBadge } from '@/components/Badge/Badge'
+import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { monthLabel } from '@/utils/format'
 import './Dashboard.scss'
 
 type DashboardProps = {

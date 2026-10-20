@@ -1,4 +1,4 @@
-import { statusLabel } from '../../lib/format'
+import { statusLabel } from '@/utils/format'
 
 export function DaysBadge({ days }: { days: number }) {
   if (days < 0) {

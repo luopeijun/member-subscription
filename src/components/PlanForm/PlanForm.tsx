@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react'
-import { api } from '../../api'
-import type { AppState, SavedHandler } from '../../types'
-import { CATEGORIES } from '../../constants'
-import { CYCLE_OPTIONS } from '../../lib/cycle'
-import { Modal } from '../Modal/Modal'
-import { toMinor } from '../../../shared/money'
+import { api } from '@/api'
+import type { AppState, SavedHandler } from '@/types'
+import { CATEGORIES } from '@/constants'
+import { CYCLE_OPTIONS } from '@/utils/cycle'
+import { Modal } from '@/components/Modal/Modal'
+import { toMinor } from '@shared/money'
 
 /* ---------------------------------- 候选套餐 --------------------------------- */
 

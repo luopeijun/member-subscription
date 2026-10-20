@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import type { AppState, Subscription } from '../../types'
-import { formatCNY } from '../../../shared/money'
-import { DaysBadge, StatusBadge } from '../../components/Badge/Badge'
-import { EmptyState } from '../../components/EmptyState/EmptyState'
-import { cycleLabel } from '../../lib/cycle'
-import { formatDate } from '../../lib/format'
+import type { AppState, Subscription } from '@/types'
+import { formatCNY } from '@shared/money'
+import { DaysBadge, StatusBadge } from '@/components/Badge/Badge'
+import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { cycleLabel } from '@/utils/cycle'
+import { formatDate } from '@/utils/format'
 import './Subscriptions.scss'
 
 type SubscriptionsProps = {

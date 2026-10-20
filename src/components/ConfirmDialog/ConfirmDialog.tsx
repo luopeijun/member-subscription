@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Modal } from '../Modal/Modal'
+import { Modal } from '@/components/Modal/Modal'
 import './ConfirmDialog.scss'
 
 type ConfirmDialogProps = {

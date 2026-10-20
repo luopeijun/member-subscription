@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react'
-import { api } from '../../api'
-import type { AppState, SavedHandler, Subscription } from '../../types'
-import { CATEGORIES, PLATFORM_SUGGESTIONS, STATUS_OPTIONS } from '../../constants'
-import { FormSectionTitle } from '../FormSectionTitle/FormSectionTitle'
-import { Modal } from '../Modal/Modal'
-import { CYCLE_OPTIONS } from '../../lib/cycle'
-import { toMajor, toMinor } from '../../../shared/money'
+import { api } from '@/api'
+import type { AppState, SavedHandler, Subscription } from '@/types'
+import { CATEGORIES, PLATFORM_SUGGESTIONS, STATUS_OPTIONS } from '@/constants'
+import { FormSectionTitle } from '@/components/FormSectionTitle/FormSectionTitle'
+import { Modal } from '@/components/Modal/Modal'
+import { CYCLE_OPTIONS } from '@/utils/cycle'
+import { toMajor, toMinor } from '@shared/money'
 
 /* ---------------------------------- 会员表单 --------------------------------- */
 

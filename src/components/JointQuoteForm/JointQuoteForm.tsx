@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react'
-import { api } from '../../api'
-import type { AppState, SavedHandler, Subscription } from '../../types'
-import { PLATFORM_SUGGESTIONS } from '../../constants'
-import { Modal } from '../Modal/Modal'
-import { formatCNY, toMinor } from '../../../shared/money'
-import { DAYS_PER_MONTH, DURATION_PRESETS } from '../../../shared/duration'
-import { clampDurationDays } from '../../lib/duration'
+import { api } from '@/api'
+import type { AppState, SavedHandler, Subscription } from '@/types'
+import { PLATFORM_SUGGESTIONS } from '@/constants'
+import { Modal } from '@/components/Modal/Modal'
+import { formatCNY, toMinor } from '@shared/money'
+import { DAYS_PER_MONTH, DURATION_PRESETS } from '@shared/duration'
+import { clampDurationDays } from '@/utils/duration'
 import './JointQuoteForm.scss'
 
 /* ---------------------------------- 联合报价 --------------------------------- */

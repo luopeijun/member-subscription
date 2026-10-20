@@ -5,12 +5,12 @@ import type {
   Plan,
   Snapshot,
   Subscription,
-} from '../../types'
-import { formatCNY } from '../../../shared/money'
-import { DAYS_PER_MONTH, formatDuration } from '../../../shared/duration'
-import { EmptyState } from '../../components/EmptyState/EmptyState'
-import { cycleLabel } from '../../lib/cycle'
-import { formatDay } from '../../lib/format'
+} from '@/types'
+import { formatCNY } from '@shared/money'
+import { DAYS_PER_MONTH, formatDuration } from '@shared/duration'
+import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { cycleLabel } from '@/utils/cycle'
+import { formatDay } from '@/utils/format'
 import './Compare.scss'
 
 type CompareProps = {

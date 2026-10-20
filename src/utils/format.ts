@@ -1,4 +1,4 @@
-import { STATUS_OPTIONS } from '../constants'
+import { STATUS_OPTIONS } from '@/constants'
 
 export function formatDate(iso: string | null): string {
   if (!iso) return '—'
