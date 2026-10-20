@@ -1,3 +1,4 @@
+import { SelectMenu } from '@/components/SelectMenu/SelectMenu'
 import './Pagination.scss'
 
 type PaginationProps = {
@@ -33,20 +34,19 @@ export function Pagination({
         <span className="pager-info">
           共 <strong>{total}</strong> 条
         </span>
-        <label className="pager-size">
+        <span className="pager-size">
           每页
-          <select
-            value={pageSize}
-            onChange={(event) => changeSize(Number(event.target.value))}
-            aria-label="每页条数"
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>
-                {size} 条
-              </option>
-            ))}
-          </select>
-        </label>
+          <SelectMenu
+            value={String(pageSize)}
+            onChange={(value) => changeSize(Number(value))}
+            ariaLabel="每页条数"
+            size="sm"
+            options={pageSizeOptions.map((size) => ({
+              value: String(size),
+              label: `${size} 条`,
+            }))}
+          />
+        </span>
       </div>
       <div className="pager-right">
         <button className="pager-btn" onClick={() => onPageChange(1)} disabled={current === 1}>

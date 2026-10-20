@@ -38,27 +38,9 @@
   color: var(--muted);
 }
 
-.pager-size select {
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--text);
-  font-size: 12px;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.pager-size select:hover {
-  border-color: #c9cde0;
-}
-
-.pager-size select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+.pager-size .select-popover {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 
 .pager-btn {

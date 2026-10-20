@@ -3,6 +3,7 @@ import type { AppState, Subscription } from '@/types'
 import { CATEGORIES } from '@/constants'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import { SearchBox } from '@/components/SearchBox/SearchBox'
+import { SelectMenu } from '@/components/SelectMenu/SelectMenu'
 import { sortSubscriptions, subscriptionMatchesQuery } from '@/utils/subscription'
 import { SubscriptionCard } from './SubscriptionCard'
 import './Subscriptions.scss'
@@ -105,19 +106,23 @@ export function Subscriptions({
           })}
         </div>
         <div className="toolbar-right">
-          <select
-            className="toolbar-select"
+          <SelectMenu
             value={category}
-            onChange={(event) => setCategory(event.target.value)}
-            aria-label="按类别筛选"
-          >
-            <option value="all">全部类别</option>
-            {categoryOptions.map((item) => (
-              <option key={item.name} value={item.name}>
-                {item.name}（{item.count}）
-              </option>
-            ))}
-          </select>
+            onChange={setCategory}
+            ariaLabel="按类别筛选"
+            options={[
+              {
+                value: 'all',
+                label: '全部类别',
+                meta: String(state.subscriptions.length),
+              },
+              ...categoryOptions.map((item) => ({
+                value: item.name,
+                label: item.name,
+                meta: String(item.count),
+              })),
+            ]}
+          />
           <SearchBox
             value={query}
             onChange={setQuery}

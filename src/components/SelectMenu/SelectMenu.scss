@@ -1,0 +1,190 @@
+.select-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
+}
+
+.select-trigger:hover {
+  border-color: var(--line-strong);
+  background: #fafbfc;
+}
+
+.select-menu.open .select-trigger {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-meta {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.select-chevron {
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-right: 1.5px solid #6b7280;
+  border-bottom: 1.5px solid #6b7280;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.select-menu.open .select-chevron {
+  transform: translateY(2px) rotate(-135deg);
+}
+
+.select-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 100%;
+  max-height: 284px;
+  padding: 6px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow:
+    0 18px 42px rgba(19, 23, 34, 0.14),
+    0 2px 6px rgba(19, 23, 34, 0.05);
+  animation: select-pop 0.12s ease-out;
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: left;
+  white-space: nowrap;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.select-option:hover,
+.select-option:focus-visible {
+  outline: none;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+.select-option.selected {
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+.select-option-label {
+  flex: 1;
+}
+
+.select-option-meta {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f1f3f7;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.select-option.selected .select-option-meta,
+.select-option:hover .select-option-meta,
+.select-option:focus-visible .select-option-meta {
+  background: #fff;
+  color: var(--accent-deep);
+}
+
+.select-option-check {
+  width: 12px;
+  color: var(--accent);
+  font-size: 12px;
+  text-align: center;
+  visibility: hidden;
+}
+
+.select-option.selected .select-option-check {
+  visibility: visible;
+}
+
+.select-menu.sm .select-trigger {
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.select-menu.sm .select-popover {
+  padding: 5px;
+}
+
+.select-menu.sm .select-option {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+@keyframes select-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .select-popover {
+    animation: none;
+  }
+
+  .select-trigger,
+  .select-chevron {
+    transition: none;
+  }
+}
