@@ -3,6 +3,7 @@ import { api } from '@/api'
 import type { AppState, JointCostMode, SavedHandler, Subscription } from '@/types'
 import { PLATFORM_SUGGESTIONS } from '@/constants'
 import { Modal } from '@/components/Modal/Modal'
+import { SelectMenu } from '@/components/SelectMenu/SelectMenu'
 import { formatCNY, toMinor } from '@shared/money'
 import { DAYS_PER_MONTH, DURATION_PRESETS } from '@shared/duration'
 import { clampDurationDays } from '@/utils/duration'
@@ -154,17 +155,17 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
         <div className="field">
           <label>这条报价包含哪些会员</label>
           <div className="joint-add-row">
-            <select
+            <SelectMenu
               value={picker}
-              onChange={(event) => setPicker(event.target.value)}
-            >
-              <option value="">选择要添加的会员</option>
-              {options.map((sub) => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.serviceName} · {sub.planName}
-                </option>
-              ))}
-            </select>
+              options={options.map((sub) => ({
+                value: String(sub.id),
+                label: `${sub.serviceName} · ${sub.planName}`,
+              }))}
+              onChange={setPicker}
+              ariaLabel="选择要添加的会员"
+              searchable
+              searchPlaceholder="搜索会员"
+            />
             <button
               type="button"
               className="btn"

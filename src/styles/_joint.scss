@@ -11,8 +11,10 @@
   gap: 8px;
 }
 
-.joint-add-row select {
+.joint-add-row select,
+.joint-add-row .select-menu {
   flex: 1;
+  min-width: 0;
 }
 
 .joint-add-row .btn,

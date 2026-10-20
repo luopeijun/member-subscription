@@ -5,6 +5,7 @@ import { formatCNY, toMinor } from '@shared/money'
 import { addDaysISO, DURATION_PRESETS, formatDuration } from '@shared/duration'
 import { clampDurationDays } from '@/utils/duration'
 import { Modal } from '@/components/Modal/Modal'
+import { SelectMenu } from '@/components/SelectMenu/SelectMenu'
 import { formatDate } from '@/utils/format'
 import './JointRenewForm.scss'
 
@@ -143,17 +144,17 @@ export function JointRenewForm({ state, onClose, onSaved }: JointRenewFormProps)
         <div className="field">
           <label>参与本次续费的会员</label>
           <div className="joint-add-row">
-            <select
+            <SelectMenu
               value={picker}
-              onChange={(event) => setPicker(event.target.value)}
-            >
-              <option value="">选择要添加的会员</option>
-              {options.map((sub) => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.serviceName} · {sub.planName}
-                </option>
-              ))}
-            </select>
+              options={options.map((sub) => ({
+                value: String(sub.id),
+                label: `${sub.serviceName} · ${sub.planName}`,
+              }))}
+              onChange={setPicker}
+              ariaLabel="选择要添加的会员"
+              searchable
+              searchPlaceholder="搜索会员"
+            />
             <button
               type="button"
               className="btn"
@@ -164,7 +165,7 @@ export function JointRenewForm({ state, onClose, onSaved }: JointRenewFormProps)
             </button>
           </div>
           <p className="joint-hint">
-            所有会员都可以自由组合。这次一起买，不代表以后必须一起续；每个会员拿到的天数可以不同。
+            所有会员可自由组合。联合续费仅记录本次购买，不影响后续是否继续一起续费；每个会员的服务时长可不同。
           </p>
         </div>
 
