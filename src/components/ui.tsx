@@ -79,7 +79,7 @@ export function statusLabel(value: string): string {
 
 export function DaysBadge({ days }: { days: number }) {
   if (days < 0) {
-    return <span className="badge danger">已逾期 {Math.abs(days)} 天</span>
+    return <span className="badge danger">已过期 {Math.abs(days)} 天</span>
   }
   if (days === 0) {
     return <span className="badge warn">今天到期</span>

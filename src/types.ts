@@ -128,7 +128,7 @@ export type Stats = {
   monthly: number
   totalSpent: number
   upcoming30: number
-  overdueCount: number
+  expiredCount: number
   categories: { category: string; annualized: number; count: number }[]
   monthlySpend: { month: string; total: number }[]
   upcoming: Upcoming[]

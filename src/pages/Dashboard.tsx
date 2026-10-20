@@ -58,8 +58,8 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
         <div className="card kpi">
           <span className="kpi-label">30 天内到期</span>
           <strong className="kpi-value">{stats.upcoming30}</strong>
-          <span className={`kpi-sub ${stats.overdueCount > 0 ? 'danger-text' : ''}`}>
-            {stats.overdueCount > 0 ? `${stats.overdueCount} 个已逾期` : '暂无逾期'}
+          <span className={`kpi-sub ${stats.expiredCount > 0 ? 'danger-text' : ''}`}>
+            {stats.expiredCount > 0 ? `${stats.expiredCount} 个已过期` : '暂无过期'}
           </span>
         </div>
         <div className="card kpi">

@@ -228,6 +228,14 @@ export function buildState() {
       !planned && cycle > 0 ? addMonths(last?.paid_at ?? sub.started_at, cycle) : null
     const nextRenewalAt = planned ? null : sub.next_renewal_override || computedNext
     const daysLeft = nextRenewalAt ? daysBetween(today, nextRenewalAt) : null
+    // 状态跟着日期走：过了到期日就是已过期，续费把日期推后会自然恢复活跃。
+    const status = planned
+      ? 'planned'
+      : nextRenewalAt && nextRenewalAt < today
+        ? 'expired'
+        : !nextRenewalAt && sub.status === 'expired'
+          ? 'expired'
+          : 'active'
 
     // A joint purchase can hand this member a duration that differs from the
     // plan's own cycle (e.g. a 1-month perk on an annual plan), so fall back to
@@ -257,7 +265,7 @@ export function buildState() {
       startedAt: sub.started_at,
       nextRenewalOverride: sub.next_renewal_override,
       autoRenew: Boolean(sub.auto_renew),
-      status: sub.status,
+      status,
       sharedWith: sub.shared_with,
       note: sub.note,
       lastPayment: last
@@ -276,6 +284,8 @@ export function buildState() {
   })
 
   const active = subscriptions.filter((sub) => sub.status === 'active')
+  const expiredCount = subscriptions.filter((sub) => sub.status === 'expired').length
+  const activePlanIds = new Set(active.map((sub) => sub.planId))
   const annualized = active.reduce((sum, sub) => sum + sub.annualized, 0)
 
   const upcoming = active
@@ -345,7 +355,7 @@ export function buildState() {
       cycleMonths: plan.cycle_months,
       listPrice: plan.list_price,
       note: plan.note,
-      subscribed: Boolean(plan.subscribed),
+      subscribed: activePlanIds.has(plan.id),
     })),
     subscriptions,
     payments: [...paymentRows].reverse().map((payment) => ({
@@ -419,7 +429,7 @@ export function buildState() {
       monthly: Math.round(annualized / 12),
       totalSpent,
       upcoming30: upcoming.filter((item) => item.daysLeft >= 0 && item.daysLeft <= 30).length,
-      overdueCount: upcoming.filter((item) => item.daysLeft < 0).length,
+      expiredCount,
       categories,
       monthlySpend,
       upcoming,
