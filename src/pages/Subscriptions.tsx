@@ -21,8 +21,11 @@ type Props = {
 const FILTERS = [
   { value: 'all', label: '全部' },
   { value: 'active', label: '活跃' },
+  { value: 'planned', label: '想买' },
   { value: 'expired', label: '已过期' },
 ] as const
+
+const STATUS_ORDER: Record<string, number> = { active: 0, planned: 1, expired: 2 }
 
 type Filter = (typeof FILTERS)[number]['value']
 
@@ -54,7 +57,9 @@ export function Subscriptions({
     })
 
     return [...filtered].sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'active' ? -1 : 1
+      if (a.status !== b.status) {
+        return (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)
+      }
       if (a.nextRenewalAt && b.nextRenewalAt) {
         return a.nextRenewalAt.localeCompare(b.nextRenewalAt)
       }
@@ -175,16 +180,26 @@ export function Subscriptions({
                     {sub.lastPayment ? formatCNY(sub.lastPayment.amount) : '—'}
                   </strong>
                   <small>
-                    {sub.lastPayment ? formatDate(sub.lastPayment.paidAt) : '未记录支付'}
+                    {sub.lastPayment
+                      ? formatDate(sub.lastPayment.paidAt)
+                      : sub.status === 'planned'
+                        ? '还没买'
+                        : '未记录支付'}
                   </small>
                 </div>
                 <div>
                   <span>月均成本</span>
                   <strong>
-                    {sub.cycleMonths <= 0 ? cycleLabel(sub.cycleMonths) : formatCNY(Math.round(sub.annualized / 12))}
+                    {sub.status === 'planned'
+                      ? '—'
+                      : sub.cycleMonths <= 0
+                        ? cycleLabel(sub.cycleMonths)
+                        : formatCNY(Math.round(sub.annualized / 12))}
                   </strong>
                   <small>
-                    累计 {formatCNY(sub.totalSpent)} · {sub.paymentCount} 笔
+                    {sub.status === 'planned'
+                      ? '尚未产生支出'
+                      : `累计 ${formatCNY(sub.totalSpent)} · ${sub.paymentCount} 笔`}
                   </small>
                 </div>
               </div>
@@ -220,18 +235,20 @@ export function Subscriptions({
                   </>
                 ) : (
                   <span className="muted">
-                    {sub.status === 'active'
-                      ? sub.cycleMonths === -1
-                        ? '买断，永久有效'
-                        : '一次性付费，无后续扣款'
-                      : '无到期记录'}
+                    {sub.status === 'planned'
+                      ? '想买但还没买，点「记一笔购买」开始记录'
+                      : sub.status === 'active'
+                        ? sub.cycleMonths === -1
+                          ? '买断，永久有效'
+                          : '一次性付费，无后续扣款'
+                        : '无到期记录'}
                   </span>
                 )}
               </div>
 
               <footer className="sub-actions">
                 <button className="btn sm" onClick={() => onRenew(sub)}>
-                  记一笔续费
+                  {sub.status === 'planned' ? '记一笔购买' : '记一笔续费'}
                 </button>
                 <button className="btn sm" onClick={() => onEdit(sub)}>
                   编辑

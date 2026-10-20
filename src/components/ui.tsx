@@ -33,6 +33,7 @@ export const PLATFORM_SUGGESTIONS = [
 
 export const STATUS_OPTIONS = [
   { value: 'active', label: '活跃' },
+  { value: 'planned', label: '想买' },
   { value: 'expired', label: '已过期' },
 ]
 
@@ -93,7 +94,7 @@ export function DaysBadge({ days }: { days: number }) {
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const tone = status === 'active' ? 'ok' : 'muted'
+  const tone = status === 'active' ? 'ok' : status === 'planned' ? 'info' : 'muted'
   return <span className={`badge ${tone}`}>{statusLabel(status)}</span>
 }
 

@@ -106,6 +106,8 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
     patch({ serviceName: name, category: known?.category ?? form.category })
   }
 
+  const planned = form.status === 'planned'
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
@@ -125,7 +127,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
       return
     }
 
-    if (!editing) {
+    if (!editing && !planned) {
       const amountNumber = Number(form.amount)
       if (form.amount === '' || !Number.isFinite(amountNumber) || amountNumber < 0) {
         setError('请填写本次支付金额')
@@ -171,11 +173,15 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
             status: form.status,
             sharedWith: form.sharedWith.trim() || null,
             note: form.note.trim() || null,
-            payment: {
-              paidAt: form.paidAt,
-              amount: toMinor(Number(form.amount)),
-              note: form.paymentNote.trim() || null,
-            },
+            ...(planned
+              ? {}
+              : {
+                  payment: {
+                    paidAt: form.paidAt,
+                    amount: toMinor(Number(form.amount)),
+                    note: form.paymentNote.trim() || null,
+                  },
+                }),
           }),
         })
       }
@@ -191,7 +197,11 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
   return (
     <Modal
       title={editing ? '编辑会员' : '添加会员'}
-      subtitle={editing ? `${editing.serviceName} · ${editing.planName}` : '记录一个正在付费的会员'}
+      subtitle={
+        editing
+          ? `${editing.serviceName} · ${editing.planName}`
+          : '记录会员；想买但还没买的也可以先记下来'
+      }
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -258,7 +268,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
               onChange={(event) => patch({ listPrice: event.target.value })}
             />
           </div>
-          {!editing ? (
+          {!editing && !planned ? (
             <>
               <div className="field">
                 <label>本次支付金额（元）*</label>
@@ -290,6 +300,12 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
             </>
           ) : null}
         </div>
+
+        {!editing && planned ? (
+          <p className="form-hint">
+            想买状态先不记支付；之后在会员卡片点「记一笔购买」，记录支付后会自动转为活跃。
+          </p>
+        ) : null}
 
         {sectionTitle('订阅信息')}
         <div className="form-grid">
@@ -333,14 +349,16 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
               ))}
             </select>
           </div>
-          <div className="field">
-            <label>下次续费日（选填覆盖）</label>
-            <input
-              type="date"
-              value={form.nextRenewalOverride}
-              onChange={(event) => patch({ nextRenewalOverride: event.target.value })}
-            />
-          </div>
+          {!planned ? (
+            <div className="field">
+              <label>下次续费日（选填覆盖）</label>
+              <input
+                type="date"
+                value={form.nextRenewalOverride}
+                onChange={(event) => patch({ nextRenewalOverride: event.target.value })}
+              />
+            </div>
+          ) : null}
           <div className="field">
             <label>合租 / 共享备注</label>
             <input
@@ -349,17 +367,19 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
               onChange={(event) => patch({ sharedWith: event.target.value })}
             />
           </div>
-          <div className="field">
-            <label>自动续费</label>
-            <label className="checkline">
-              <input
-                type="checkbox"
-                checked={form.autoRenew}
-                onChange={(event) => patch({ autoRenew: event.target.checked })}
-              />
-              <span>到期自动扣款</span>
-            </label>
-          </div>
+          {!planned ? (
+            <div className="field">
+              <label>自动续费</label>
+              <label className="checkline">
+                <input
+                  type="checkbox"
+                  checked={form.autoRenew}
+                  onChange={(event) => patch({ autoRenew: event.target.checked })}
+                />
+                <span>到期自动扣款</span>
+              </label>
+            </div>
+          ) : null}
           <div className="field">
             <label>备注</label>
             <input
@@ -447,7 +467,8 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
           note: note.trim() || null,
         }),
       })
-      onSaved(next, '支付记录已添加')
+      const target = state.subscriptions.find((item) => item.id === subId)
+      onSaved(next, target?.status === 'planned' ? '已记录购买，会员转为活跃' : '支付记录已添加')
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -457,10 +478,18 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
 
   return (
     <Modal
-      title={subscription ? '记录续费' : '记一笔支付'}
+      title={
+        subscription
+          ? subscription.status === 'planned'
+            ? '记一笔购买'
+            : '记录续费'
+          : '记一笔支付'
+      }
       subtitle={
         subscription
-          ? `${subscription.serviceName} · ${subscription.planName}`
+          ? subscription.status === 'planned'
+            ? `${subscription.serviceName} · ${subscription.planName} · 记下后转为活跃`
+            : `${subscription.serviceName} · ${subscription.planName}`
           : '选择会员并填写这次的实际支付'
       }
       onClose={onClose}

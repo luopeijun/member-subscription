@@ -222,9 +222,11 @@ export function buildState() {
     const prev = payments.at(-2) ?? null
     const cycle = plan?.cycle_months ?? 12
 
+    // 想买还没付款，既没有到期日，也不该按开始日期推算下一次扣款。
+    const planned = sub.status === 'planned'
     const computedNext =
-      cycle > 0 ? addMonths(last?.paid_at ?? sub.started_at, cycle) : null
-    const nextRenewalAt = sub.next_renewal_override || computedNext
+      !planned && cycle > 0 ? addMonths(last?.paid_at ?? sub.started_at, cycle) : null
+    const nextRenewalAt = planned ? null : sub.next_renewal_override || computedNext
     const daysLeft = nextRenewalAt ? daysBetween(today, nextRenewalAt) : null
 
     // A joint purchase can hand this member a duration that differs from the

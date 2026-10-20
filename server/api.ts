@@ -1,12 +1,14 @@
 import { Router, type Request, type Response } from 'express'
-import { db } from './db'
+import fs from 'node:fs'
+import path from 'node:path'
+import { db, dbPath } from './db'
 import { HttpError } from './errors'
 import { buildState } from './store'
 import { seedDemoData } from './seed'
 import { addDays, addMonths, isISODate, nowISO, todayISO } from './util'
 import { exportAll, importAll } from './transfer'
 
-const STATUSES = new Set(['active', 'expired'])
+const STATUSES = new Set(['active', 'expired', 'planned'])
 
 function route(handler: (req: Request, res: Response) => void) {
   return (req: Request, res: Response) => {
@@ -237,7 +239,13 @@ apiRouter.post(
     const note = optionalText(body.note, 300)
     const autoRenew = body.autoRenew === true
 
-    const payment = (body.payment ?? {}) as Record<string, unknown>
+    const payment =
+      body.payment && typeof body.payment === 'object'
+        ? (body.payment as Record<string, unknown>)
+        : null
+    if (subscriptionStatus === 'planned' && payment) {
+      throw new HttpError(400, '想买状态不记录支付，请改为活跃后再填写金额')
+    }
 
     const transaction = db.transaction(() => {
       const serviceId = upsertService(serviceName, category)
@@ -266,7 +274,7 @@ apiRouter.post(
           nowISO(),
         )
       const subscriptionId = Number(subInfo.lastInsertRowid)
-      insertPayment(subscriptionId, payment)
+      if (payment) insertPayment(subscriptionId, payment)
       return subscriptionId
     })
 
@@ -411,8 +419,10 @@ apiRouter.post(
           | { paid_at: string }
           | undefined
         const currentNext =
-          row.next_renewal_override ||
-          addMonths(last?.paid_at ?? row.started_at, row.plan_cycle)
+          row.status === 'planned'
+            ? paidAt
+            : row.next_renewal_override ||
+              addMonths(last?.paid_at ?? row.started_at, row.plan_cycle)
         const nextDate = addDays(currentNext, member.days)
         return { member, row, nextDate }
       })
@@ -484,8 +494,14 @@ apiRouter.post(
   '/subscriptions/:id/payments',
   route((req, res) => {
     const id = idParam(req.params.id, '会员记录')
-    getSubscription(id)
-    insertPayment(id, req.body ?? {})
+    const sub = getSubscription(id)
+    db.transaction(() => {
+      insertPayment(id, req.body ?? {})
+      // 想买只是一条待购清单；一旦记录了支付，就说明已经买了。
+      if (sub.status === 'planned') {
+        db.prepare("UPDATE subscriptions SET status = 'active' WHERE id = ?").run(id)
+      }
+    })()
     res.status(201).json(buildState())
   }),
 )
@@ -655,6 +671,11 @@ apiRouter.delete(
     if (req.body?.confirm !== 'DELETE') {
       throw new HttpError(400, '需要确认参数')
     }
+    // 清空是不可逆操作，先留一份完整快照，万一误点还能从 data/backups 找回。
+    const backupDir = path.join(path.dirname(dbPath), 'backups')
+    fs.mkdirSync(backupDir, { recursive: true })
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    db.prepare('VACUUM INTO ?').run(path.join(backupDir, `app-${stamp}.db`))
     db.transaction(() => {
       db.prepare('DELETE FROM joint_quote_items').run()
       db.prepare('DELETE FROM joint_quotes').run()

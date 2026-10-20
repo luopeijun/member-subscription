@@ -66,6 +66,7 @@ function createdStamp(value: unknown): string {
 }
 
 function normalizeStatus(value: unknown): string {
+  if (value === 'planned') return 'planned'
   if (value === 'expired' || value === 'paused' || value === 'cancelled') return 'expired'
   return 'active'
 }

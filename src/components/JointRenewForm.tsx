@@ -201,8 +201,17 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
                         {isMain ? ' · 主会员' : ''}
                       </strong>
                       <span>
-                        {member.sub.planName} · 到期{' '}
-                        {formatDate(member.sub.nextRenewalAt)} → {formatDate(nextDate)}
+                        {member.sub.status === 'planned' ? (
+                          <>
+                            {member.sub.planName} · 还没买，从 {formatDate(paidAt)} 起{' '}
+                            {member.days} 天
+                          </>
+                        ) : (
+                          <>
+                            {member.sub.planName} · 到期{' '}
+                            {formatDate(member.sub.nextRenewalAt)} → {formatDate(nextDate)}
+                          </>
+                        )}
                       </span>
                     </div>
                     <div className="joint-member-duration">
