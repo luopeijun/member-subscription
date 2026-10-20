@@ -38,7 +38,7 @@ export function JointRenewForm({ state, onClose, onSaved }: Props) {
   const [picker, setPicker] = useState('')
   const [total, setTotal] = useState('')
   const [paidAt, setPaidAt] = useState(state.today)
-  const [defaultDays, setDefaultDays] = useState(360)
+  const [defaultDays, setDefaultDays] = useState(365)
   const [costMode, setCostMode] = useState<JointCostMode>('split')
   const [note, setNote] = useState('')
   const [error, setError] = useState('')

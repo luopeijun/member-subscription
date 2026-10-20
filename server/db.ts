@@ -265,10 +265,12 @@ if (!durationColumns.some((column) => column.name === 'duration_days')) {
 }
 db.exec(
   `UPDATE payments
-   SET duration_days = COALESCE(
-         (SELECT cycle_months FROM joint_renewals WHERE joint_renewals.id = payments.joint_renewal_id),
-         0
-       ) * 30
+   SET duration_days = ROUND(
+         COALESCE(
+           (SELECT cycle_months FROM joint_renewals WHERE joint_renewals.id = payments.joint_renewal_id),
+           0
+         ) * 365.0 / 12
+       )
    WHERE joint_renewal_id IS NOT NULL AND duration_days IS NULL`,
 )
 
@@ -288,9 +290,11 @@ if (!quoteItemDurationColumns.some((column) => column.name === 'duration_days'))
 }
 db.exec(
   `UPDATE joint_quote_items
-   SET duration_days = COALESCE(
-         (SELECT cycle_months FROM joint_quotes WHERE joint_quotes.id = joint_quote_items.joint_quote_id),
-         12
-       ) * 30
+   SET duration_days = ROUND(
+         COALESCE(
+           (SELECT cycle_months FROM joint_quotes WHERE joint_quotes.id = joint_quote_items.joint_quote_id),
+           12
+         ) * 365.0 / 12
+       )
    WHERE duration_days IS NULL`,
 )

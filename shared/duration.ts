@@ -1,4 +1,7 @@
-export const DAYS_PER_MONTH = 30
+export const DAYS_PER_YEAR = 365
+
+/** 一个月按 365 / 12 天折算，这样 365 天正好等于 12 个月。 */
+export const DAYS_PER_MONTH = DAYS_PER_YEAR / 12
 
 /** 联合续费 / 联合报价里，每个会员拿到的时长统一用「天」表示。 */
 export function formatDuration(days: number): string {
@@ -12,6 +15,6 @@ export const DURATION_PRESETS: { days: number; label: string }[] = [
   { days: 30, label: '1 个月' },
   { days: 90, label: '3 个月' },
   { days: 180, label: '6 个月' },
-  { days: 360, label: '1 年' },
-  { days: 390, label: '1 年 + 1 个月' },
+  { days: 365, label: '1 年' },
+  { days: 395, label: '1 年 + 1 个月' },
 ]
