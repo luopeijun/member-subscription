@@ -1,6 +1,7 @@
 import type { Snapshot } from '@/types'
 import { formatCNY } from '@shared/money'
-import { formatDate, formatDay } from '@/utils/format'
+import { formatDuration } from '@shared/duration'
+import { formatDay } from '@/utils/format'
 import './SnapshotHistory.scss'
 
 type SnapshotHistoryProps = {
@@ -30,8 +31,8 @@ export function SnapshotHistory({ snapshots, onDelete }: SnapshotHistoryProps) {
               </strong>
               <span>
                 {snapshot.note ?? '—'}
-                {snapshot.expiresAt
-                  ? ` · 到期 ${formatDate(snapshot.expiresAt)}`
+                {snapshot.durationDays !== null && snapshot.durationDays > 0
+                  ? ` · 总时长 ${formatDuration(snapshot.durationDays)}`
                   : ''}
               </span>
             </div>

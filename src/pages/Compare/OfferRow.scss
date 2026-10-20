@@ -35,11 +35,11 @@
 .offer-price,
 .offer-monthly,
 .offer-date,
-.offer-expiry {
+.offer-duration {
   font-variant-numeric: tabular-nums;
 }
 
-.offer-expiry {
+.offer-duration {
   color: var(--muted);
   white-space: nowrap;
 }

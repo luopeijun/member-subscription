@@ -1,9 +1,11 @@
+import { DURATION_PRESETS, MAX_DURATION_DAYS } from '@shared/duration'
 import { PLATFORM_SUGGESTIONS } from '@/constants'
 import { cycleKey, cycleOptions, readCycle } from '@/utils/cycle'
 import {
-  quoteExpiryDays,
-  quoteExpiryMonthly,
-  quoteExpiryTerm,
+  quoteDurationDays,
+  quoteDurationError,
+  quoteDurationTerm,
+  quoteMonthly,
   type QuoteDraft,
 } from '@/utils/quote'
 import { formatCNY } from '@shared/money'
@@ -17,10 +19,11 @@ type QuoteFieldsProps = {
 }
 
 export function QuoteFields({ value, onChange, idPrefix }: QuoteFieldsProps) {
-  const expiryDays = quoteExpiryDays(value)
-  const expiryTerm = quoteExpiryTerm(value)
-  const expiryMonthly = quoteExpiryMonthly(value)
-  const hasExpiry = Boolean(value.expiresAt)
+  const durationDays = quoteDurationDays(value)
+  const durationTerm = quoteDurationTerm(value)
+  const monthly = quoteMonthly(value)
+  const durationError = quoteDurationError(value)
+  const hasDuration = value.durationDays.trim() !== ''
 
   return (
     <div className="form-grid quote-fields">
@@ -79,31 +82,47 @@ export function QuoteFields({ value, onChange, idPrefix }: QuoteFieldsProps) {
       </div>
       <div className="field span-2">
         <label className="label-with-tip">
-          会员到期日（可选）
-          <InfoTip text="不填写按照计费周期折算，不固定计费周期可填写具体到期时间" />
+          套餐总时长（天，选填）
+          <InfoTip text="填写该报价包含的总时长（天）；未填写时按计费周期折算。365 天按 1 年计算。" />
         </label>
-        <input
-          type="date"
-          className="quote-expiry-input"
-          value={value.expiresAt}
-          onChange={(event) => onChange({ expiresAt: event.target.value })}
-        />
-        {hasExpiry ? (
-          expiryDays !== null ? (
-            <p className="quote-expiry-summary">
-              实际时长约 <strong>{expiryTerm}</strong>
-              {expiryMonthly !== null ? (
-                <>
-                  {' '}
-                  · 等效月成本 <strong>{formatCNY(expiryMonthly)}</strong>
-                </>
-              ) : null}
-            </p>
-          ) : (
-            <p className="quote-expiry-summary invalid">
-              到期日需要晚于记录日期
-            </p>
-          )
+        <div className="duration-input quote-duration-input">
+          <input
+            type="number"
+            min={1}
+            max={MAX_DURATION_DAYS}
+            step={1}
+            value={value.durationDays}
+            placeholder="按计费周期折算"
+            aria-label="套餐总时长（天）"
+            onChange={(event) => onChange({ durationDays: event.target.value })}
+          />
+          <span>天</span>
+        </div>
+        <div className="duration-presets">
+          {DURATION_PRESETS.map((preset) => (
+            <button
+              key={preset.days}
+              type="button"
+              className={`btn sm${durationDays === preset.days ? ' active' : ''}`}
+              onClick={() => onChange({ durationDays: String(preset.days) })}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        {durationError ? (
+          <p className="quote-duration-summary invalid">{durationError}</p>
+        ) : hasDuration && durationDays !== null ? (
+          <p className="quote-duration-summary">
+            总时长 <strong>{durationDays} 天</strong>
+            {durationTerm ? <>（约 {durationTerm}）</> : null}
+            {monthly !== null ? (
+              <>
+                {' '}
+                · 等效月成本 <strong>{formatCNY(monthly)}</strong>
+              </>
+            ) : null}
+          </p>
         ) : null}
       </div>
     </div>

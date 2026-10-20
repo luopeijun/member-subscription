@@ -1,7 +1,7 @@
 import type { Snapshot } from '@/types'
 import { formatCNY } from '@shared/money'
-import { formatDate, formatDay } from '@/utils/format'
-import { snapshotMonthly, snapshotTermLabel } from '@/utils/snapshot'
+import { formatDay } from '@/utils/format'
+import { snapshotDurationLabel, snapshotMonthly } from '@/utils/snapshot'
 import './OfferRow.scss'
 
 type OfferRowProps = {
@@ -20,7 +20,7 @@ export function OfferRow({
   onDelete,
 }: OfferRowProps) {
   const monthly = snapshotMonthly(offer)
-  const term = snapshotTermLabel(offer)
+  const term = snapshotDurationLabel(offer)
   const diff = monthly !== null && myMonthly !== null ? monthly - myMonthly : null
   const isCurrent =
     Boolean(myPlatform) &&
@@ -54,9 +54,7 @@ export function OfferRow({
         )}
       </span>
       <span className="offer-date">{formatDay(offer.capturedAt)}</span>
-      <span className="offer-expiry">
-        {offer.expiresAt ? formatDate(offer.expiresAt) : '—'}
-      </span>
+      <span className="offer-duration">{snapshotDurationLabel(offer)}</span>
       <span className="offer-note">{offer.note ?? '—'}</span>
       <button className="btn sm danger offer-delete" onClick={() => onDelete(offer)}>
         删除

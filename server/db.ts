@@ -74,6 +74,7 @@ db.exec(`
     price INTEGER NOT NULL,
     cycle_months INTEGER NOT NULL DEFAULT 0,
     cycle_days INTEGER,
+    duration_days INTEGER,
     expires_at TEXT,
     platform TEXT,
     note TEXT,
@@ -278,6 +279,17 @@ if (!snapshotColumns.some((column) => column.name === 'cycle_days')) {
 if (!snapshotColumns.some((column) => column.name === 'expires_at')) {
   db.exec('ALTER TABLE price_snapshots ADD COLUMN expires_at TEXT')
 }
+if (!snapshotColumns.some((column) => column.name === 'duration_days')) {
+  db.exec('ALTER TABLE price_snapshots ADD COLUMN duration_days INTEGER')
+}
+// 旧报价记录的是到期日，换算成这条报价实际包含的总天数。
+db.exec(
+  `UPDATE price_snapshots
+   SET duration_days = CAST(ROUND(julianday(expires_at) - julianday(captured_at)) AS INTEGER)
+   WHERE duration_days IS NULL
+     AND expires_at IS NOT NULL
+     AND julianday(expires_at) > julianday(captured_at)`,
+)
 
 // Joint members used to share one bundle-wide cycle. Each member now carries
 // its own duration, always measured in days (a perk can be as short as a few

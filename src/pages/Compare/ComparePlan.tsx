@@ -92,7 +92,7 @@ export function ComparePlan({
             <span>等效月成本</span>
             <span>对比我的</span>
             <span>记录日期</span>
-            <span>到期日</span>
+            <span>总时长</span>
             <span>怎么买</span>
             <span />
           </div>

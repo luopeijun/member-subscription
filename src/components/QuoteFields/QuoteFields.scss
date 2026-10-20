@@ -4,25 +4,28 @@
   gap: 6px;
 }
 
-.field .quote-date-input,
-.field .quote-expiry-input {
+.field .quote-date-input {
   width: 220px;
   max-width: 100%;
 }
 
-.quote-expiry-summary {
-  margin-top: 2px;
+.field .quote-duration-input input {
+  width: 96px;
+}
+
+.quote-duration-summary {
+  margin-top: 4px;
   color: var(--muted);
   font-size: 11.5px;
   line-height: 1.45;
 }
 
-.quote-expiry-summary strong {
+.quote-duration-summary strong {
   color: var(--accent-deep);
   font-weight: 650;
 }
 
-.quote-expiry-summary.invalid {
+.quote-duration-summary.invalid {
   color: var(--danger);
 }
 

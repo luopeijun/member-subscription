@@ -1,6 +1,7 @@
 import { db } from './db'
 import { HttpError } from './errors'
-import { isISODate, nowISO } from './util'
+import { daysBetween, isISODate, nowISO } from './util'
+import { MAX_DURATION_DAYS } from '../shared/duration'
 
 export type ImportSummary = {
   servicesAdded: number
@@ -59,6 +60,11 @@ function date(value: unknown, label: string): string {
 function nullableDate(value: unknown, label: string): string | null {
   if (value === null || value === undefined || value === '') return null
   return date(value, label)
+}
+
+function optionalDurationDays(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  return integer(value, '报价总时长（天）', 1, MAX_DURATION_DAYS)
 }
 
 function createdStamp(value: unknown): string {
@@ -151,7 +157,7 @@ export function exportAll() {
       .all(),
     snapshots: db
       .prepare(
-        `SELECT id, plan_id, captured_at, expires_at, price, cycle_months, cycle_days,
+        `SELECT id, plan_id, captured_at, duration_days, price, cycle_months, cycle_days,
           platform, note, created_at
          FROM price_snapshots ORDER BY id`,
       )
@@ -242,7 +248,7 @@ export function importAll(payload: unknown): ImportSummary {
     )
     const insertSnapshot = db.prepare(
       `INSERT INTO price_snapshots
-        (plan_id, captured_at, expires_at, price, cycle_months, cycle_days, platform, note, created_at)
+        (plan_id, captured_at, duration_days, price, cycle_months, cycle_days, platform, note, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertJointQuote = db.prepare(
@@ -434,14 +440,21 @@ export function importAll(payload: unknown): ImportSummary {
         row.cycle_days ?? fallbackCycle.cycleDays,
       )
       const capturedAt = date(row.captured_at, '报价日期')
-      const expiresAt = nullableDate(row.expires_at, '报价到期日')
-      if (expiresAt && expiresAt <= capturedAt) {
-        throw new HttpError(400, '报价到期日需要晚于报价日期')
+      let durationDays = optionalDurationDays(row.duration_days)
+      if (durationDays === null) {
+        // 旧备份用到期日表示这条报价覆盖的时间，换算成总天数。
+        const legacyExpiresAt = nullableDate(row.expires_at, '报价到期日')
+        if (legacyExpiresAt) {
+          const legacyDays = daysBetween(capturedAt, legacyExpiresAt)
+          if (legacyDays > 0) {
+            durationDays = Math.min(legacyDays, MAX_DURATION_DAYS)
+          }
+        }
       }
       insertSnapshot.run(
         planId,
         capturedAt,
-        expiresAt,
+        durationDays,
         integer(row.price, '报价价格', 0),
         cycle.cycleMonths,
         cycle.cycleDays,

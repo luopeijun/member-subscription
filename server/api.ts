@@ -6,7 +6,7 @@ import { HttpError } from './errors'
 import { buildState } from './store'
 import { seedDemoData } from './seed'
 import { addDays, addMonths, isISODate, nowISO, todayISO } from './util'
-import { DAYS_PER_MONTH } from '../shared/duration'
+import { DAYS_PER_MONTH, MAX_DURATION_DAYS } from '../shared/duration'
 import { exportAll, importAll } from './transfer'
 
 const STATUSES = new Set(['active', 'expired', 'planned'])
@@ -96,6 +96,11 @@ function cycleDays(value: unknown): number | null {
   return integer(value, '周期天数', 1, 3650)
 }
 
+function quoteDurationDays(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  return integer(value, '套餐总时长（天）', 1, MAX_DURATION_DAYS)
+}
+
 type Cycle = {
   cycleMonths: number
   cycleDays: number | null
@@ -117,7 +122,7 @@ function parseCycle(body: Record<string, unknown>, fallback: Cycle): Cycle {
 
 type QuoteInput = {
   capturedAt: string
-  expiresAt: string | null
+  durationDays: number | null
   price: number
   cycleMonths: number
   cycleDays: number | null
@@ -127,13 +132,9 @@ type QuoteInput = {
 
 function readQuote(body: Record<string, unknown>, fallback: Cycle): QuoteInput {
   const capturedAt = date(body.capturedAt, '记录日期')
-  const expiresAt = maybeDate(body.expiresAt, '到期日')
-  if (expiresAt && expiresAt <= capturedAt) {
-    throw new HttpError(400, '到期日需要晚于记录日期')
-  }
   return {
     capturedAt,
-    expiresAt,
+    durationDays: quoteDurationDays(body.durationDays),
     price: integer(body.price, '价格', 0, 1_000_000_000_000),
     ...parseCycle(body, fallback),
     platform: text(body.platform, '平台', 60),
@@ -144,12 +145,12 @@ function readQuote(body: Record<string, unknown>, fallback: Cycle): QuoteInput {
 function insertPriceSnapshot(planId: number, quote: QuoteInput) {
   db.prepare(
     `INSERT INTO price_snapshots
-      (plan_id, captured_at, expires_at, price, cycle_months, cycle_days, platform, note, created_at)
+      (plan_id, captured_at, duration_days, price, cycle_months, cycle_days, platform, note, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     planId,
     quote.capturedAt,
-    quote.expiresAt,
+    quote.durationDays,
     quote.price,
     quote.cycleMonths,
     quote.cycleDays,
