@@ -65,3 +65,8 @@
   color: var(--text);
   font-size: 14px;
 }
+
+.quote-compare-cell .badge {
+  align-self: flex-start;
+  width: fit-content;
+}
