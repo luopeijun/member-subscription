@@ -175,7 +175,7 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
           ? subscription.status === 'planned'
             ? `${subscription.serviceName} · ${subscription.planName} · 记下后转为活跃`
             : `${subscription.serviceName} · ${subscription.planName}`
-          : '选择会员并填写这次的实际支付'
+          : '选择会员并填写本次实际支付'
       }
       onClose={onClose}
     >
@@ -214,14 +214,14 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
             />
           </div>
           <div className="field">
-            <label>这次买到的时长（天，选填）</label>
+            <label>本次支付覆盖时长（天，选填）</label>
             <input
               type="number"
               min="1"
               max={MAX_DURATION_DAYS}
               step="1"
               value={durationDays}
-              placeholder="留空则按套餐周期"
+              placeholder="未填写时按套餐计费周期"
               onChange={(event) => changeDuration(event.target.value)}
             />
           </div>
@@ -256,11 +256,11 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
               {dateInvalid
                 ? `下次续费日需要晚于起算日 ${formatDate(base)}。`
                 : durationTooLong
-                  ? `续费时长最多为 ${MAX_DURATION_DAYS} 天。`
+                  ? `本次支付覆盖时长最多为 ${MAX_DURATION_DAYS} 天。`
                   : durationInvalid
-                    ? '续费时长至少为 1 天。'
+                    ? '本次支付覆盖时长至少为 1 天。'
                     : preview && duration !== null
-                      ? `${formatDate(base)} 起算，买到 ${duration} 天，下次续费日 ${formatDate(preview)}。`
+                      ? `${formatDate(base)} 起算，覆盖 ${duration} 天，下次续费日 ${formatDate(preview)}。`
                       : '时长和下次续费日会进行互相换算。留空时按套餐计费周期推算。'}
             </p>
           </div>
