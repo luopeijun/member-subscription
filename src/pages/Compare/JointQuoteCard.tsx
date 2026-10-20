@@ -45,15 +45,24 @@ export function JointQuoteCard({ quote, onDelete }: JointQuoteCardProps) {
         {quote.items.length === 0 ? (
           <span className="muted">关联会员已删除</span>
         ) : (
-          quote.items.map((item) => (
-            <span className="joint-quote-item" key={item.subscriptionId}>
-              {item.serviceName}
-              <em>
-                {formatDuration(item.durationDays)} · 分摊 {formatCNY(item.amount)}
-                {item.monthly === null ? '' : ` · 当前 ${formatCNY(item.monthly)}/月`}
-              </em>
-            </span>
-          ))
+          quote.items.map((item) => {
+            const allocatedMonthly =
+              item.durationDays > 0
+                ? Math.round((item.amount * DAYS_PER_MONTH) / item.durationDays)
+                : null
+            return (
+              <span className="joint-quote-item" key={item.subscriptionId}>
+                {item.serviceName}
+                <em>
+                  {formatDuration(item.durationDays)} · 分摊 {formatCNY(item.amount)}
+                  {allocatedMonthly === null
+                    ? ''
+                    : ` · 分摊后等效 ${formatCNY(allocatedMonthly)}/月`}
+                  {item.monthly === null ? '' : ` · 当前 ${formatCNY(item.monthly)}/月`}
+                </em>
+              </span>
+            )
+          })
         )}
       </div>
 
