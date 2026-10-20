@@ -181,7 +181,7 @@ export function Subscriptions({
                 <div>
                   <span>月均成本</span>
                   <strong>
-                    {sub.cycleMonths === 0 ? '一次性' : formatCNY(Math.round(sub.annualized / 12))}
+                    {sub.cycleMonths <= 0 ? cycleLabel(sub.cycleMonths) : formatCNY(Math.round(sub.annualized / 12))}
                   </strong>
                   <small>
                     累计 {formatCNY(sub.totalSpent)} · {sub.paymentCount} 笔
@@ -220,7 +220,11 @@ export function Subscriptions({
                   </>
                 ) : (
                   <span className="muted">
-                    {sub.status === 'active' ? '无后续扣款（一次性 / 终身）' : '无到期记录'}
+                    {sub.status === 'active'
+                      ? sub.cycleMonths === -1
+                        ? '买断，永久有效'
+                        : '一次性付费，无后续扣款'
+                      : '无到期记录'}
                   </span>
                 )}
               </div>

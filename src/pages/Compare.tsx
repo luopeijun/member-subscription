@@ -25,7 +25,7 @@ type Props = {
 }
 
 function equivalentMonthly(cycleMonths: number, amount: number): number | null {
-  if (cycleMonths === 0) return null
+  if (cycleMonths <= 0) return null
   return Math.round(amount / cycleMonths)
 }
 

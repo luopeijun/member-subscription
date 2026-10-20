@@ -70,10 +70,10 @@ function normalizeStatus(value: unknown): string {
   return 'active'
 }
 
-const CYCLE_MONTHS = new Set([0, 1, 3, 6, 12])
+const CYCLE_MONTHS = new Set([-1, 0, 1, 3, 6, 12])
 
 function normalizeCycle(value: unknown): number {
-  const months = integer(value, '套餐周期', 0, 120)
+  const months = integer(value, '套餐周期', -1, 120)
   return CYCLE_MONTHS.has(months) ? months : 12
 }
 

@@ -7,6 +7,7 @@ import {
   Modal,
   PLATFORM_SUGGESTIONS,
   STATUS_OPTIONS,
+  cycleLabel,
 } from './ui'
 import { formatCNY, toMajor, toMinor } from '../../shared/money'
 import { DAYS_PER_MONTH, DURATION_PRESETS } from '../../shared/duration'
@@ -575,7 +576,7 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
   return (
     <Modal
       title="记录平台报价"
-      subtitle={`${plan.serviceName} · ${plan.name} · ${plan.cycleMonths === 0 ? '一次性' : `${plan.cycleMonths} 个月`}`}
+      subtitle={`${plan.serviceName} · ${plan.name} · ${cycleLabel(plan.cycleMonths)}`}
       onClose={onClose}
     >
       <form onSubmit={submit}>

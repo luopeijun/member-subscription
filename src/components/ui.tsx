@@ -6,7 +6,8 @@ export const CYCLE_OPTIONS = [
   { value: 3, label: '季付' },
   { value: 6, label: '半年付' },
   { value: 12, label: '年付' },
-  { value: 0, label: '一次性 / 终身' },
+  { value: 0, label: '一次性付费' },
+  { value: -1, label: '买断（永久）' },
 ]
 
 export const CATEGORIES = [
@@ -37,8 +38,10 @@ export const STATUS_OPTIONS = [
 
 export function cycleLabel(months: number): string {
   switch (months) {
+    case -1:
+      return '买断'
     case 0:
-      return '一次性'
+      return '一次性付费'
     case 1:
       return '月付'
     case 3:

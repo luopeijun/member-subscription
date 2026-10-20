@@ -78,12 +78,12 @@ function status(value: unknown): string {
   return value
 }
 
-const CYCLE_MONTHS = new Set([0, 1, 3, 6, 12])
+const CYCLE_MONTHS = new Set([-1, 0, 1, 3, 6, 12])
 
 function cycle(value: unknown): number {
-  const months = integer(value, '周期', 0, 120)
+  const months = integer(value, '周期', -1, 120)
   if (!CYCLE_MONTHS.has(months)) {
-    throw new HttpError(400, '计费周期只能是月付、季付、半年付、年付或一次性')
+    throw new HttpError(400, '计费周期只能是月付、季付、半年付、年付、一次性付费或买断')
   }
   return months
 }
