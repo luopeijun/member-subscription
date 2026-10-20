@@ -151,7 +151,7 @@ export function exportAll() {
       .all(),
     snapshots: db
       .prepare(
-        `SELECT id, plan_id, captured_at, price, cycle_months, cycle_days,
+        `SELECT id, plan_id, captured_at, expires_at, price, cycle_months, cycle_days,
           platform, note, created_at
          FROM price_snapshots ORDER BY id`,
       )
@@ -242,8 +242,8 @@ export function importAll(payload: unknown): ImportSummary {
     )
     const insertSnapshot = db.prepare(
       `INSERT INTO price_snapshots
-        (plan_id, captured_at, price, cycle_months, cycle_days, platform, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (plan_id, captured_at, expires_at, price, cycle_months, cycle_days, platform, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertJointQuote = db.prepare(
       `INSERT INTO joint_quotes (captured_at, total, cycle_months, platform, note, created_at)
@@ -433,9 +433,15 @@ export function importAll(payload: unknown): ImportSummary {
         row.cycle_months ?? fallbackCycle.cycleMonths,
         row.cycle_days ?? fallbackCycle.cycleDays,
       )
+      const capturedAt = date(row.captured_at, '报价日期')
+      const expiresAt = nullableDate(row.expires_at, '报价到期日')
+      if (expiresAt && expiresAt <= capturedAt) {
+        throw new HttpError(400, '报价到期日需要晚于报价日期')
+      }
       insertSnapshot.run(
         planId,
-        date(row.captured_at, '报价日期'),
+        capturedAt,
+        expiresAt,
         integer(row.price, '报价价格', 0),
         cycle.cycleMonths,
         cycle.cycleDays,

@@ -90,6 +90,7 @@ export type Snapshot = {
   cycleMonths: number
   cycleDays: number | null
   capturedAt: string
+  expiresAt: string | null
   price: number
   platform: string | null
   note: string | null

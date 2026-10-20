@@ -3,8 +3,11 @@ import { api } from '@/api'
 import type { AppState, Plan, SavedHandler } from '@/types'
 import { PLATFORM_SUGGESTIONS } from '@/constants'
 import { cycleKey, cycleLabel, cycleOptions, readCycle } from '@/utils/cycle'
+import { formatTermDays } from '@/utils/snapshot'
 import { Modal } from '@/components/Modal/Modal'
-import { toMajor, toMinor } from '@shared/money'
+import { DAYS_PER_MONTH, daysBetweenISO } from '@shared/duration'
+import { formatCNY, toMajor, toMinor } from '@shared/money'
+import './SnapshotForm.scss'
 
 /* ---------------------------------- 平台报价 --------------------------------- */
 
@@ -23,20 +26,43 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
   const [cycleMonths, setCycleMonths] = useState(plan.cycleMonths)
   const [cycleDays, setCycleDays] = useState<number | null>(plan.cycleDays)
   const [capturedAt, setCapturedAt] = useState(today)
+  const [expiresAt, setExpiresAt] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const priceNumber = Number(price)
+  const priceMinor =
+    price !== '' && Number.isFinite(priceNumber) && priceNumber >= 0
+      ? toMinor(priceNumber)
+      : null
+  const expiryDays =
+    expiresAt && capturedAt ? daysBetweenISO(capturedAt, expiresAt) : null
+  const hasValidExpiry = expiryDays !== null && expiryDays > 0
+  const expiryTerm =
+    hasValidExpiry && expiryDays !== null ? formatTermDays(expiryDays) : null
+  const expiryMonthly =
+    hasValidExpiry && expiryDays !== null && priceMinor !== null
+      ? Math.round((priceMinor * DAYS_PER_MONTH) / expiryDays)
+      : null
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
-    const priceNumber = Number(price)
-    if (price === '' || !Number.isFinite(priceNumber) || priceNumber < 0) {
+    if (priceMinor === null) {
       setError('请填写价格')
       return
     }
     if (!platform.trim()) {
       setError('请填写平台名称')
+      return
+    }
+    if (!capturedAt) {
+      setError('请填写记录日期')
+      return
+    }
+    if (expiresAt && !hasValidExpiry) {
+      setError('到期日需要晚于记录日期')
       return
     }
     setBusy(true)
@@ -46,7 +72,8 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
         body: JSON.stringify({
           planId: plan.id,
           capturedAt,
-          price: toMinor(priceNumber),
+          expiresAt: expiresAt || null,
+          price: priceMinor,
           cycleMonths,
           cycleDays,
           platform: platform.trim(),
@@ -118,6 +145,40 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
               value={capturedAt}
               onChange={(event) => setCapturedAt(event.target.value)}
             />
+          </div>
+          <div className="field span-2">
+            <label>会员到期日（可选）</label>
+            <div className="quote-expiry-row">
+              <input
+                type="date"
+                className="quote-expiry-input"
+                value={expiresAt}
+                onChange={(event) => setExpiresAt(event.target.value)}
+              />
+              <span
+                className={`quote-expiry-help ${
+                  expiresAt && !hasValidExpiry ? 'invalid' : ''
+                }`}
+              >
+                {expiresAt ? (
+                  hasValidExpiry ? (
+                    <>
+                      实际时长约 <strong>{expiryTerm}</strong>
+                      {expiryMonthly !== null ? (
+                        <>
+                          {' '}
+                          · 等效月成本 <strong>{formatCNY(expiryMonthly)}</strong>
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    '到期日需要晚于记录日期'
+                  )
+                ) : (
+                  '不填就按计费周期折算；遇到 1 年 3 个月这类固定到期日时填这里'
+                )}
+              </span>
+            </div>
           </div>
         </div>
 

@@ -70,6 +70,7 @@ type SnapshotRow = {
   id: number
   plan_id: number
   captured_at: string
+  expires_at: string | null
   price: number
   platform: string | null
   note: string | null
@@ -171,7 +172,7 @@ export function buildState() {
 
   const snapshotRows = db
     .prepare(
-      `SELECT ps.id, ps.plan_id, ps.captured_at, ps.price, ps.cycle_months, ps.cycle_days, ps.platform, ps.note,
+      `SELECT ps.id, ps.plan_id, ps.captured_at, ps.expires_at, ps.price, ps.cycle_months, ps.cycle_days, ps.platform, ps.note,
         s.name AS service_name, pl.name AS plan_name
       FROM price_snapshots ps
       JOIN plans pl ON pl.id = ps.plan_id
@@ -407,6 +408,7 @@ export function buildState() {
       cycleMonths: snapshot.cycle_months,
       cycleDays: snapshot.cycle_days,
       capturedAt: snapshot.captured_at,
+      expiresAt: snapshot.expires_at,
       price: snapshot.price,
       platform: snapshot.platform,
       note: snapshot.note,

@@ -1,0 +1,28 @@
+.quote-expiry-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quote-expiry-row .quote-expiry-input {
+  flex: 0 1 220px;
+  min-width: 160px;
+}
+
+.quote-expiry-help {
+  flex: 1;
+  min-width: 220px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.quote-expiry-help strong {
+  color: var(--accent-deep);
+  font-weight: 650;
+}
+
+.quote-expiry-help.invalid {
+  color: var(--danger);
+}

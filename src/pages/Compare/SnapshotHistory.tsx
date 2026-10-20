@@ -1,6 +1,6 @@
 import type { Snapshot } from '@/types'
 import { formatCNY } from '@shared/money'
-import { formatDay } from '@/utils/format'
+import { formatDate, formatDay } from '@/utils/format'
 import './SnapshotHistory.scss'
 
 type SnapshotHistoryProps = {
@@ -28,7 +28,12 @@ export function SnapshotHistory({ snapshots, onDelete }: SnapshotHistoryProps) {
               <strong>
                 {snapshot.serviceName} · {snapshot.planName}
               </strong>
-              <span>{snapshot.note ?? '—'}</span>
+              <span>
+                {snapshot.note ?? '—'}
+                {snapshot.expiresAt
+                  ? ` · 到期 ${formatDate(snapshot.expiresAt)}`
+                  : ''}
+              </span>
             </div>
             <span className="history-price">{formatCNY(snapshot.price)}</span>
             <button className="btn sm danger" onClick={() => onDelete(snapshot)}>

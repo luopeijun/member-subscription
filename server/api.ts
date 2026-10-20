@@ -706,6 +706,10 @@ apiRouter.post(
     if (!plan) throw new HttpError(404, '套餐不存在')
 
     const capturedAt = date(body.capturedAt, '记录日期')
+    const expiresAt = maybeDate(body.expiresAt, '到期日')
+    if (expiresAt && expiresAt <= capturedAt) {
+      throw new HttpError(400, '到期日需要晚于记录日期')
+    }
     const price = integer(body.price, '价格', 0, 1_000_000_000_000)
     const { cycleMonths, cycleDays } = parseCycle(body, {
       cycleMonths: plan.cycle_months,
@@ -716,11 +720,12 @@ apiRouter.post(
 
     db.prepare(
       `INSERT INTO price_snapshots
-        (plan_id, captured_at, price, cycle_months, cycle_days, platform, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (plan_id, captured_at, expires_at, price, cycle_months, cycle_days, platform, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       planId,
       capturedAt,
+      expiresAt,
       price,
       cycleMonths,
       cycleDays,

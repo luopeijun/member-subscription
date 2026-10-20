@@ -74,6 +74,7 @@ db.exec(`
     price INTEGER NOT NULL,
     cycle_months INTEGER NOT NULL DEFAULT 0,
     cycle_days INTEGER,
+    expires_at TEXT,
     platform TEXT,
     note TEXT,
     created_at TEXT NOT NULL
@@ -273,6 +274,9 @@ if (!planColumns.some((column) => column.name === 'cycle_days')) {
 }
 if (!snapshotColumns.some((column) => column.name === 'cycle_days')) {
   db.exec('ALTER TABLE price_snapshots ADD COLUMN cycle_days INTEGER')
+}
+if (!snapshotColumns.some((column) => column.name === 'expires_at')) {
+  db.exec('ALTER TABLE price_snapshots ADD COLUMN expires_at TEXT')
 }
 
 // Joint members used to share one bundle-wide cycle. Each member now carries

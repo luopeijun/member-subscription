@@ -1,6 +1,6 @@
 .offer-row {
   display: grid;
-  grid-template-columns: 1.15fr 1fr 0.9fr 1fr 0.7fr 1.7fr auto;
+  grid-template-columns: 1.15fr 1fr 0.9fr 1fr 0.7fr 0.9fr 1.6fr auto;
   gap: 10px;
   align-items: center;
   padding: 9px 12px;
@@ -34,8 +34,14 @@
 
 .offer-price,
 .offer-monthly,
-.offer-date {
+.offer-date,
+.offer-expiry {
   font-variant-numeric: tabular-nums;
+}
+
+.offer-expiry {
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .offer-price small {

@@ -2,7 +2,7 @@ import type { Plan, Snapshot, Subscription } from '@/types'
 import { formatCNY } from '@shared/money'
 import { cycleLabel, cycleMonthly } from '@/utils/cycle'
 import { formatDay } from '@/utils/format'
-import { latestPerPlatform } from '@/utils/snapshot'
+import { latestPerPlatform, snapshotMonthly } from '@/utils/snapshot'
 import { OfferRow } from './OfferRow'
 import './ComparePlan.scss'
 
@@ -31,7 +31,7 @@ export function ComparePlan({
     : null
   const offers = latestPerPlatform(snapshots, plan.id)
   const monthlyOffers = offers
-    .map((offer) => cycleMonthly(offer.cycleMonths, offer.cycleDays, offer.price))
+    .map((offer) => snapshotMonthly(offer))
     .filter((value): value is number => value !== null)
   const lowestMonthly = monthlyOffers.length > 0 ? Math.min(...monthlyOffers) : null
 
@@ -92,6 +92,7 @@ export function ComparePlan({
             <span>等效月成本</span>
             <span>对比我的</span>
             <span>记录日期</span>
+            <span>到期日</span>
             <span>怎么买</span>
             <span />
           </div>

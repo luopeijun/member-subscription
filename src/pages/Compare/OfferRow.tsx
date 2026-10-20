@@ -1,7 +1,7 @@
 import type { Snapshot } from '@/types'
 import { formatCNY } from '@shared/money'
-import { cycleLabel, cycleMonthly } from '@/utils/cycle'
-import { formatDay } from '@/utils/format'
+import { formatDate, formatDay } from '@/utils/format'
+import { snapshotMonthly, snapshotTermLabel } from '@/utils/snapshot'
 import './OfferRow.scss'
 
 type OfferRowProps = {
@@ -19,7 +19,8 @@ export function OfferRow({
   lowestMonthly,
   onDelete,
 }: OfferRowProps) {
-  const monthly = cycleMonthly(offer.cycleMonths, offer.cycleDays, offer.price)
+  const monthly = snapshotMonthly(offer)
+  const term = snapshotTermLabel(offer)
   const diff = monthly !== null && myMonthly !== null ? monthly - myMonthly : null
   const isCurrent =
     Boolean(myPlatform) &&
@@ -36,7 +37,7 @@ export function OfferRow({
       </span>
       <span className="offer-price">
         {formatCNY(offer.price)}
-        <small> / {cycleLabel(offer.cycleMonths, offer.cycleDays)}</small>
+        <small> / {term}</small>
       </span>
       <span className="offer-monthly">
         {monthly !== null ? `${formatCNY(monthly)}/月` : '—'}
@@ -53,6 +54,9 @@ export function OfferRow({
         )}
       </span>
       <span className="offer-date">{formatDay(offer.capturedAt)}</span>
+      <span className="offer-expiry">
+        {offer.expiresAt ? formatDate(offer.expiresAt) : '—'}
+      </span>
       <span className="offer-note">{offer.note ?? '—'}</span>
       <button className="btn sm danger offer-delete" onClick={() => onDelete(offer)}>
         删除
