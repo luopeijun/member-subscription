@@ -222,7 +222,15 @@ export function Subscriptions({
                 {sub.nextRenewalAt ? (
                   <>
                     <div>
-                      <span>{sub.status === 'active' ? '下次续费' : '到期日'}</span>
+                      <span>
+                        {sub.nextRenewalOverride
+                          ? sub.status === 'active'
+                            ? '下次续费（手动）'
+                            : '到期日（手动）'
+                          : sub.status === 'active'
+                            ? '下次续费'
+                            : '到期日'}
+                      </span>
                       <strong>{formatDate(sub.nextRenewalAt)}</strong>
                     </div>
                     {sub.status === 'active' ? (

@@ -234,6 +234,7 @@ apiRouter.post(
     const platform = optionalText(body.platform, 60)
     const account = optionalText(body.account, 120)
     const startedAt = date(body.startedAt, '开始日期')
+    const nextRenewalOverride = maybeDate(body.nextRenewalOverride, '下次续费日期')
     const subscriptionStatus = status(body.status ?? 'active')
     const sharedWith = optionalText(body.sharedWith, 120)
     const note = optionalText(body.note, 300)
@@ -266,7 +267,7 @@ apiRouter.post(
           platform,
           account,
           startedAt,
-          null,
+          nextRenewalOverride,
           autoRenew ? 1 : 0,
           subscriptionStatus,
           sharedWith,

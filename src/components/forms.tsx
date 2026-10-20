@@ -169,6 +169,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
             platform: form.platform.trim() || null,
             account: form.account.trim() || null,
             startedAt: form.startedAt,
+            nextRenewalOverride: form.nextRenewalOverride || null,
             autoRenew: form.autoRenew,
             status: form.status,
             sharedWith: form.sharedWith.trim() || null,
