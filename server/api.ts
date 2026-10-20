@@ -6,6 +6,7 @@ import { HttpError } from './errors'
 import { buildState } from './store'
 import { seedDemoData } from './seed'
 import { addDays, addMonths, isISODate, nowISO, todayISO } from './util'
+import { DAYS_PER_MONTH } from '../shared/duration'
 import { exportAll, importAll } from './transfer'
 
 const STATUSES = new Set(['active', 'expired', 'planned'])
@@ -80,14 +81,38 @@ function status(value: unknown): string {
   return value
 }
 
-const CYCLE_MONTHS = new Set([-1, 0, 1, 3, 6, 12])
+const CYCLE_MONTHS = new Set([-1, 0, 1, 3, 6, 12, 24])
 
 function cycle(value: unknown): number {
   const months = integer(value, '周期', -1, 120)
   if (!CYCLE_MONTHS.has(months)) {
-    throw new HttpError(400, '计费周期只能是月付、季付、半年付、年付、一次性付费或买断')
+    throw new HttpError(400, '计费周期只能是 1 天、1 周、月付、季付、半年付、年付、2 年、一次性付费或买断')
   }
   return months
+}
+
+function cycleDays(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  return integer(value, '周期天数', 1, 3650)
+}
+
+type Cycle = {
+  cycleMonths: number
+  cycleDays: number | null
+}
+
+function parseCycle(body: Record<string, unknown>, fallback: Cycle): Cycle {
+  // 明确传了天数就以天数为准；传 null / 空字符串表示改回月周期。
+  if (body.cycleDays !== undefined) {
+    const days = cycleDays(body.cycleDays)
+    if (days !== null) return { cycleMonths: 0, cycleDays: days }
+  }
+  if (body.cycleMonths !== undefined) {
+    return { cycleMonths: cycle(body.cycleMonths), cycleDays: null }
+  }
+  const fallbackDays = cycleDays(fallback.cycleDays)
+  if (fallbackDays !== null) return { cycleMonths: 0, cycleDays: fallbackDays }
+  return { cycleMonths: cycle(fallback.cycleMonths), cycleDays: null }
 }
 
 function idParam(value: string, label: string): number {
@@ -117,6 +142,7 @@ function upsertService(name: string, category: string): number {
 type PlanInput = {
   name: string
   cycleMonths: number
+  cycleDays: number | null
   listPrice: number
   note: string | null
 }
@@ -125,9 +151,12 @@ function upsertPlan(serviceId: number, input: PlanInput): number {
   const existing = db
     .prepare(
       `SELECT id FROM plans
-       WHERE service_id = ? AND name = ? COLLATE NOCASE AND cycle_months = ?`,
+       WHERE service_id = ? AND name = ? COLLATE NOCASE AND cycle_months = ?
+         AND IFNULL(cycle_days, -1) = IFNULL(?, -1)`,
     )
-    .get(serviceId, input.name, input.cycleMonths) as { id: number } | undefined
+    .get(serviceId, input.name, input.cycleMonths, input.cycleDays) as
+    | { id: number }
+    | undefined
 
   if (existing) {
     db.prepare(
@@ -138,13 +167,14 @@ function upsertPlan(serviceId: number, input: PlanInput): number {
 
   const info = db
     .prepare(
-      `INSERT INTO plans (service_id, name, cycle_months, list_price, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO plans (service_id, name, cycle_months, cycle_days, list_price, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       serviceId,
       input.name,
       input.cycleMonths,
+      input.cycleDays,
       input.listPrice,
       input.note,
       nowISO(),
@@ -170,18 +200,105 @@ function getSubscription(id: number) {
   return sub
 }
 
-function insertPayment(subscriptionId: number, body: Record<string, unknown>) {
+type PaymentOptions = {
+  /** 新建会员时的首笔支付，从支付日直接起算，不再叠加原到期日。 */
+  initial?: boolean
+}
+
+function insertPayment(
+  subscriptionId: number,
+  body: Record<string, unknown>,
+  options: PaymentOptions = {},
+) {
   const paidAt = date(body.paidAt, '支付日期')
   const amount = integer(body.amount, '支付金额', 0, 1_000_000_000_000)
+  const durationDays =
+    body.durationDays === null ||
+    body.durationDays === undefined ||
+    body.durationDays === ''
+      ? null
+      : integer(body.durationDays, '续费时长（天）', 1, 3650)
+
+  const sub = db
+    .prepare(
+      `SELECT s.id, s.started_at, s.next_renewal_override, s.status,
+              p.cycle_months, p.cycle_days
+       FROM subscriptions s
+       JOIN plans p ON p.id = s.plan_id
+       WHERE s.id = ?`,
+    )
+    .get(subscriptionId) as
+    | {
+        id: number
+        started_at: string
+        next_renewal_override: string | null
+        status: string
+        cycle_months: number
+        cycle_days: number | null
+      }
+    | undefined
+  if (!sub) throw new HttpError(404, '会员记录不存在')
+
+  const last = db
+    .prepare(
+      `SELECT paid_at FROM payments
+       WHERE subscription_id = ?
+       ORDER BY paid_at DESC, id DESC
+       LIMIT 1`,
+    )
+    .get(subscriptionId) as { paid_at: string } | undefined
+
+  const planned = sub.status === 'planned'
+  const planNext =
+    sub.cycle_days !== null && sub.cycle_days > 0
+      ? addDays(last?.paid_at ?? sub.started_at, sub.cycle_days)
+      : sub.cycle_months > 0
+        ? addMonths(last?.paid_at ?? sub.started_at, sub.cycle_months)
+        : null
+  const currentNext = planned ? null : sub.next_renewal_override || planNext
+  // 到期日还在未来就从原到期日顺延；已过期、想买或首笔支付则从本次支付日起算。
+  const base =
+    options.initial || planned || !currentNext || currentNext <= paidAt
+      ? paidAt
+      : currentNext
+
+  const nextDate =
+    durationDays !== null
+      ? addDays(base, durationDays)
+      : sub.cycle_days !== null && sub.cycle_days > 0
+        ? addDays(base, sub.cycle_days)
+        : sub.cycle_months > 0
+          ? addMonths(base, sub.cycle_months)
+          : null
 
   const info = db
     .prepare(
-      `INSERT INTO payments (subscription_id, paid_at, amount, note, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO payments
+        (subscription_id, paid_at, amount, note, duration_days, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(subscriptionId, paidAt, amount, optionalText(body.note, 300), nowISO())
+    .run(
+      subscriptionId,
+      paidAt,
+      amount,
+      optionalText(body.note, 300),
+      durationDays,
+      nowISO(),
+    )
 
-  return { id: Number(info.lastInsertRowid), amount }
+  // 新建会员时手填的下次续费日优先，不被首笔支付推算覆盖。
+  const keepManual = options.initial && Boolean(sub.next_renewal_override)
+  if (nextDate && !keepManual) {
+    db.prepare(
+      'UPDATE subscriptions SET next_renewal_override = ?, status = ? WHERE id = ?',
+    ).run(nextDate, 'active', subscriptionId)
+  } else {
+    db.prepare("UPDATE subscriptions SET status = 'active' WHERE id = ?").run(
+      subscriptionId,
+    )
+  }
+
+  return { id: Number(info.lastInsertRowid), amount, durationDays, nextDate }
 }
 
 type JointCostMode = 'split' | 'main'
@@ -228,13 +345,16 @@ apiRouter.post(
     const serviceName = text(body.serviceName, '服务名称', 80)
     const category = text(body.category, '类别', 30)
     const planName = text(body.planName, '套餐名称', 80)
-    const cycleMonths = cycle(body.cycleMonths)
+    const { cycleMonths, cycleDays } = parseCycle(body, {
+      cycleMonths: 12,
+      cycleDays: null,
+    })
     const listPrice = integer(body.listPrice ?? 0, '标价', 0, 1_000_000_000_000)
     const platform = optionalText(body.platform, 60)
     const account = optionalText(body.account, 120)
     const startedAt = date(body.startedAt, '开始日期')
     const nextRenewalOverride = maybeDate(body.nextRenewalOverride, '下次续费日期')
-    const subscriptionStatus = status(body.status ?? 'active')
+    const requestedStatus = status(body.status ?? 'active')
     const note = optionalText(body.note, 300)
     const autoRenew = body.autoRenew === true
 
@@ -242,15 +362,15 @@ apiRouter.post(
       body.payment && typeof body.payment === 'object'
         ? (body.payment as Record<string, unknown>)
         : null
-    if (subscriptionStatus === 'planned' && payment) {
-      throw new HttpError(400, '想买状态不记录支付，请改为活跃后再填写金额')
-    }
+    // 想买只是一条待购清单；一旦在创建时记了支付，就说明已经买了。
+    const subscriptionStatus = payment && requestedStatus === 'planned' ? 'active' : requestedStatus
 
     const transaction = db.transaction(() => {
       const serviceId = upsertService(serviceName, category)
       const planId = upsertPlan(serviceId, {
         name: planName,
         cycleMonths,
+        cycleDays,
         listPrice,
         note: null,
       })
@@ -272,7 +392,7 @@ apiRouter.post(
           nowISO(),
         )
       const subscriptionId = Number(subInfo.lastInsertRowid)
-      if (payment) insertPayment(subscriptionId, payment)
+      if (payment) insertPayment(subscriptionId, payment, { initial: true })
       return subscriptionId
     })
 
@@ -293,6 +413,7 @@ apiRouter.put(
           service_id: number
           name: string
           cycle_months: number
+          cycle_days: number | null
           list_price: number
         }
       | undefined
@@ -300,7 +421,10 @@ apiRouter.put(
 
     const category = text(body.category ?? '其他', '类别', 30)
     const planName = text(body.planName ?? planRow.name, '套餐名称', 80)
-    const cycleMonths = cycle(body.cycleMonths ?? planRow.cycle_months)
+    const { cycleMonths, cycleDays } = parseCycle(body, {
+      cycleMonths: planRow.cycle_months,
+      cycleDays: planRow.cycle_days,
+    })
     const listPrice = integer(
       body.listPrice ?? planRow.list_price,
       '标价',
@@ -317,9 +441,9 @@ apiRouter.put(
       db.prepare('UPDATE services SET category = ? WHERE id = ?').run(category, planRow.service_id)
       db.prepare(
         `UPDATE plans
-         SET name = ?, cycle_months = ?, list_price = ?
+         SET name = ?, cycle_months = ?, cycle_days = ?, list_price = ?
          WHERE id = ?`,
-      ).run(planName, cycleMonths, listPrice, planRow.id)
+      ).run(planName, cycleMonths, cycleDays, listPrice, planRow.id)
       db.prepare(
         `UPDATE subscriptions
          SET platform = ?, account = ?, started_at = ?, next_renewal_override = ?, auto_renew = ?, status = ?, note = ?
@@ -356,6 +480,7 @@ type JointMemberRow = {
   next_renewal_override: string | null
   status: string
   plan_cycle: number
+  plan_cycle_days: number | null
 }
 
 apiRouter.post(
@@ -381,7 +506,7 @@ apiRouter.post(
 
     const memberStmt = db.prepare(
       `SELECT s.id, s.started_at, s.next_renewal_override, s.status,
-              p.cycle_months AS plan_cycle
+              p.cycle_months AS plan_cycle, p.cycle_days AS plan_cycle_days
        FROM subscriptions s
        JOIN plans p ON p.id = s.plan_id
        WHERE s.id = ?`,
@@ -415,17 +540,23 @@ apiRouter.post(
         const last = lastPaymentStmt.get(member.subscriptionId) as
           | { paid_at: string }
           | undefined
+        const planNext =
+          row.plan_cycle_days !== null && row.plan_cycle_days > 0
+            ? addDays(last?.paid_at ?? row.started_at, row.plan_cycle_days)
+            : addMonths(last?.paid_at ?? row.started_at, row.plan_cycle)
         const currentNext =
           row.status === 'planned'
             ? paidAt
-            : row.next_renewal_override ||
-              addMonths(last?.paid_at ?? row.started_at, row.plan_cycle)
-        const nextDate = addDays(currentNext, member.days)
+            : row.next_renewal_override || planNext
+        // 到期日还在未来就从原到期日顺延，已经过期则从本次支付日重新起算。
+        const base =
+          row.status !== 'planned' && currentNext > paidAt ? currentNext : paidAt
+        const nextDate = addDays(base, member.days)
         return { member, row, nextDate }
       })
 
       const bundleMonths = Math.max(
-        ...members.map((member) => Math.round(member.days / 30)),
+        ...members.map((member) => Math.round(member.days / DAYS_PER_MONTH)),
         0,
       )
       const jointInfo = insertJoint.run(
@@ -468,7 +599,9 @@ apiRouter.post(
           member.days,
           nowISO(),
         )
-        const nextStatus = nextDate >= todayISO() ? 'active' : row.status
+        // 想买的会员一旦参与联合续费，就直接转为活跃。
+        const nextStatus =
+          row.status === 'planned' || nextDate >= todayISO() ? 'active' : row.status
         update.run(nextDate, nextStatus, member.subscriptionId)
       })
     })()
@@ -491,13 +624,9 @@ apiRouter.post(
   '/subscriptions/:id/payments',
   route((req, res) => {
     const id = idParam(req.params.id, '会员记录')
-    const sub = getSubscription(id)
+    getSubscription(id)
     db.transaction(() => {
       insertPayment(id, req.body ?? {})
-      // 想买只是一条待购清单；一旦记录了支付，就说明已经买了。
-      if (sub.status === 'planned') {
-        db.prepare("UPDATE subscriptions SET status = 'active' WHERE id = ?").run(id)
-      }
     })()
     res.status(201).json(buildState())
   }),
@@ -526,7 +655,10 @@ apiRouter.post(
     const serviceName = text(body.serviceName, '服务名称', 80)
     const category = text(body.category, '类别', 30)
     const planName = text(body.planName, '套餐名称', 80)
-    const cycleMonths = cycle(body.cycleMonths)
+    const { cycleMonths, cycleDays } = parseCycle(body, {
+      cycleMonths: 12,
+      cycleDays: null,
+    })
     const listPrice = integer(body.listPrice ?? 0, '标价', 0, 1_000_000_000_000)
     const note = optionalText(body.note, 300)
 
@@ -535,6 +667,7 @@ apiRouter.post(
       upsertPlan(serviceId, {
         name: planName,
         cycleMonths,
+        cycleDays,
         listPrice,
         note,
       })
@@ -566,21 +699,35 @@ apiRouter.post(
     const body = req.body ?? {}
     const planId = integer(body.planId, '套餐', 1)
     const plan = db
-      .prepare('SELECT id, cycle_months FROM plans WHERE id = ?')
-      .get(planId) as { id: number; cycle_months: number } | undefined
+      .prepare('SELECT id, cycle_months, cycle_days FROM plans WHERE id = ?')
+      .get(planId) as
+      | { id: number; cycle_months: number; cycle_days: number | null }
+      | undefined
     if (!plan) throw new HttpError(404, '套餐不存在')
 
     const capturedAt = date(body.capturedAt, '记录日期')
     const price = integer(body.price, '价格', 0, 1_000_000_000_000)
-    const cycleMonths =
-      body.cycleMonths === undefined ? plan.cycle_months : cycle(body.cycleMonths)
+    const { cycleMonths, cycleDays } = parseCycle(body, {
+      cycleMonths: plan.cycle_months,
+      cycleDays: plan.cycle_days,
+    })
     const platform = text(body.platform, '平台', 60)
     const note = optionalText(body.note, 300)
 
     db.prepare(
-      `INSERT INTO price_snapshots (plan_id, captured_at, price, cycle_months, platform, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(planId, capturedAt, price, cycleMonths, platform, note, nowISO())
+      `INSERT INTO price_snapshots
+        (plan_id, captured_at, price, cycle_months, cycle_days, platform, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      planId,
+      capturedAt,
+      price,
+      cycleMonths,
+      cycleDays,
+      platform,
+      note,
+      nowISO(),
+    )
 
     res.status(201).json(buildState())
   }),
@@ -618,7 +765,7 @@ apiRouter.post(
     }
 
     const bundleMonths = Math.max(
-      ...items.map((item) => Math.round(item.days / 30)),
+      ...items.map((item) => Math.round(item.days / DAYS_PER_MONTH)),
       0,
     )
 

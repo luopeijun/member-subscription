@@ -1,6 +1,6 @@
 import type { Snapshot } from '@/types'
 import { formatCNY } from '@shared/money'
-import { cycleLabel, equivalentMonthly } from '@/utils/cycle'
+import { cycleLabel, cycleMonthly } from '@/utils/cycle'
 import { formatDay } from '@/utils/format'
 import './OfferRow.scss'
 
@@ -19,7 +19,7 @@ export function OfferRow({
   lowestMonthly,
   onDelete,
 }: OfferRowProps) {
-  const monthly = equivalentMonthly(offer.cycleMonths, offer.price)
+  const monthly = cycleMonthly(offer.cycleMonths, offer.cycleDays, offer.price)
   const diff = monthly !== null && myMonthly !== null ? monthly - myMonthly : null
   const isCurrent =
     Boolean(myPlatform) &&
@@ -36,7 +36,7 @@ export function OfferRow({
       </span>
       <span className="offer-price">
         {formatCNY(offer.price)}
-        <small> / {cycleLabel(offer.cycleMonths)}</small>
+        <small> / {cycleLabel(offer.cycleMonths, offer.cycleDays)}</small>
       </span>
       <span className="offer-monthly">
         {monthly !== null ? `${formatCNY(monthly)}/月` : '—'}

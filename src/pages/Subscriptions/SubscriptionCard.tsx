@@ -24,7 +24,7 @@ export function SubscriptionCard({
         <div>
           <h3>{sub.serviceName}</h3>
           <p>
-            {sub.planName} · {cycleLabel(sub.cycleMonths)}
+            {sub.planName} · {cycleLabel(sub.cycleMonths, sub.cycleDays)}
           </p>
         </div>
         <StatusBadge status={sub.status} />
@@ -55,11 +55,12 @@ export function SubscriptionCard({
         <div>
           <span>月均成本</span>
           <strong>
-            {sub.status === 'planned'
+            {sub.status === 'planned' ||
+            (sub.annualized <= 0 && (sub.cycleDays ?? 0) > 0)
               ? '—'
-              : sub.cycleMonths <= 0
-                ? cycleLabel(sub.cycleMonths)
-                : formatCNY(Math.round(sub.annualized / 12))}
+              : sub.annualized > 0
+                ? formatCNY(Math.round(sub.annualized / 12))
+                : cycleLabel(sub.cycleMonths, sub.cycleDays)}
           </strong>
           <small>
             {sub.status === 'planned'

@@ -1,0 +1,12 @@
+.duration-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.duration-hint {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11.5px;
+}

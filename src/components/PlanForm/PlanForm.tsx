@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { api } from '@/api'
 import type { AppState, SavedHandler } from '@/types'
 import { CATEGORIES } from '@/constants'
-import { CYCLE_OPTIONS } from '@/utils/cycle'
+import { cycleKey, cycleOptions, readCycle } from '@/utils/cycle'
 import { Modal } from '@/components/Modal/Modal'
 import { toMinor } from '@shared/money'
 
@@ -19,6 +19,7 @@ export function PlanForm({ state, onClose, onSaved }: PlanFormProps) {
   const [category, setCategory] = useState('影音娱乐')
   const [planName, setPlanName] = useState('')
   const [cycleMonths, setCycleMonths] = useState(12)
+  const [cycleDays, setCycleDays] = useState<number | null>(null)
   const [listPrice, setListPrice] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +51,7 @@ export function PlanForm({ state, onClose, onSaved }: PlanFormProps) {
           category,
           planName: planName.trim(),
           cycleMonths,
+          cycleDays,
           listPrice: toMinor(priceNumber),
           note: note.trim() || null,
         }),
@@ -112,11 +114,15 @@ export function PlanForm({ state, onClose, onSaved }: PlanFormProps) {
           <div className="field">
             <label>计费周期</label>
             <select
-              value={cycleMonths}
-              onChange={(event) => setCycleMonths(Number(event.target.value))}
+              value={cycleKey(cycleMonths, cycleDays)}
+              onChange={(event) => {
+                const next = readCycle(event.target.value)
+                setCycleMonths(next.cycleMonths)
+                setCycleDays(next.cycleDays)
+              }}
             >
-              {CYCLE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
+              {cycleOptions(cycleMonths, cycleDays).map((item) => (
+                <option key={item.key} value={item.key}>
                   {item.label}
                 </option>
               ))}

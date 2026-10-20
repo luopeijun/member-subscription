@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { api } from '@/api'
 import type { AppState, Plan, SavedHandler } from '@/types'
 import { PLATFORM_SUGGESTIONS } from '@/constants'
-import { CYCLE_OPTIONS, cycleLabel } from '@/utils/cycle'
+import { cycleKey, cycleLabel, cycleOptions, readCycle } from '@/utils/cycle'
 import { Modal } from '@/components/Modal/Modal'
 import { toMajor, toMinor } from '@shared/money'
 
@@ -21,6 +21,7 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
   )
   const [platform, setPlatform] = useState('')
   const [cycleMonths, setCycleMonths] = useState(plan.cycleMonths)
+  const [cycleDays, setCycleDays] = useState<number | null>(plan.cycleDays)
   const [capturedAt, setCapturedAt] = useState(today)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +48,7 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
           capturedAt,
           price: toMinor(priceNumber),
           cycleMonths,
+          cycleDays,
           platform: platform.trim(),
           note: note.trim() || null,
         }),
@@ -62,7 +64,7 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
   return (
     <Modal
       title="记录平台报价"
-      subtitle={`${plan.serviceName} · ${plan.name} · ${cycleLabel(plan.cycleMonths)}`}
+      subtitle={`${plan.serviceName} · ${plan.name} · ${cycleLabel(plan.cycleMonths, plan.cycleDays)}`}
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -95,11 +97,15 @@ export function SnapshotForm({ plan, today, onClose, onSaved }: SnapshotFormProp
           <div className="field">
             <label>计费周期 *</label>
             <select
-              value={cycleMonths}
-              onChange={(event) => setCycleMonths(Number(event.target.value))}
+              value={cycleKey(cycleMonths, cycleDays)}
+              onChange={(event) => {
+                const next = readCycle(event.target.value)
+                setCycleMonths(next.cycleMonths)
+                setCycleDays(next.cycleDays)
+              }}
             >
-              {CYCLE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
+              {cycleOptions(cycleMonths, cycleDays).map((item) => (
+                <option key={item.key} value={item.key}>
                   {item.label}
                 </option>
               ))}

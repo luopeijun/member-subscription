@@ -4,7 +4,7 @@ import type { AppState, SavedHandler, Subscription } from '@/types'
 import { CATEGORIES, PLATFORM_SUGGESTIONS, STATUS_OPTIONS } from '@/constants'
 import { FormSectionTitle } from '@/components/FormSectionTitle/FormSectionTitle'
 import { Modal } from '@/components/Modal/Modal'
-import { CYCLE_OPTIONS } from '@/utils/cycle'
+import { cycleKey, cycleOptions, readCycle } from '@/utils/cycle'
 import { toMajor, toMinor } from '@shared/money'
 
 /* ---------------------------------- 会员表单 --------------------------------- */
@@ -14,6 +14,7 @@ type SubFormState = {
   category: string
   planName: string
   cycleMonths: number
+  cycleDays: number | null
   listPrice: string
   platform: string
   account: string
@@ -42,6 +43,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
         category: editing.category,
         planName: editing.planName,
         cycleMonths: editing.cycleMonths,
+        cycleDays: editing.cycleDays,
         listPrice: editing.listPrice ? String(toMajor(editing.listPrice)) : '',
         platform: editing.platform ?? '',
         account: editing.account ?? '',
@@ -60,6 +62,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
       category: '影音娱乐',
       planName: '',
       cycleMonths: 12,
+      cycleDays: null,
       listPrice: '',
       platform: '官网',
       account: '',
@@ -127,6 +130,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
             category: form.category,
             planName: form.planName.trim(),
             cycleMonths: form.cycleMonths,
+            cycleDays: form.cycleDays,
             listPrice: toMinor(listPriceNumber),
             platform: form.platform.trim() || null,
             account: form.account.trim() || null,
@@ -145,6 +149,7 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
             category: form.category,
             planName: form.planName.trim(),
             cycleMonths: form.cycleMonths,
+            cycleDays: form.cycleDays,
             listPrice: toMinor(listPriceNumber),
             platform: form.platform.trim() || null,
             account: form.account.trim() || null,
@@ -223,11 +228,17 @@ export function SubscriptionForm({ state, editing, onClose, onSaved }: Subscript
           <div className="field">
             <label>计费周期</label>
             <select
-              value={form.cycleMonths}
-              onChange={(event) => patch({ cycleMonths: Number(event.target.value) })}
+              value={cycleKey(form.cycleMonths, form.cycleDays)}
+              onChange={(event) => {
+                const next = readCycle(event.target.value)
+                patch({
+                  cycleMonths: next.cycleMonths,
+                  cycleDays: next.cycleDays,
+                })
+              }}
             >
-              {CYCLE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
+              {cycleOptions(form.cycleMonths, form.cycleDays).map((item) => (
+                <option key={item.key} value={item.key}>
                   {item.label}
                 </option>
               ))}

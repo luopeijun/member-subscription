@@ -11,6 +11,7 @@ export type Plan = {
   category: string
   name: string
   cycleMonths: number
+  cycleDays: number | null
   listPrice: number
   note: string | null
   subscribed: boolean
@@ -51,6 +52,7 @@ export type Subscription = {
   category: string
   planName: string
   cycleMonths: number
+  cycleDays: number | null
   listPrice: number
   platform: string | null
   account: string | null
@@ -86,6 +88,7 @@ export type Snapshot = {
   serviceName: string
   planName: string
   cycleMonths: number
+  cycleDays: number | null
   capturedAt: string
   price: number
   platform: string | null

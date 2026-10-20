@@ -1,6 +1,6 @@
 import type { Plan, Snapshot, Subscription } from '@/types'
 import { formatCNY } from '@shared/money'
-import { cycleLabel, equivalentMonthly } from '@/utils/cycle'
+import { cycleLabel, cycleMonthly } from '@/utils/cycle'
 import { formatDay } from '@/utils/format'
 import { latestPerPlatform } from '@/utils/snapshot'
 import { OfferRow } from './OfferRow'
@@ -27,11 +27,11 @@ export function ComparePlan({
     (sub) => sub.planId === plan.id && sub.status === 'active',
   )
   const myMonthly = mySub?.lastPayment
-    ? equivalentMonthly(plan.cycleMonths, mySub.lastPayment.amount)
+    ? cycleMonthly(plan.cycleMonths, plan.cycleDays, mySub.lastPayment.amount)
     : null
   const offers = latestPerPlatform(snapshots, plan.id)
   const monthlyOffers = offers
-    .map((offer) => equivalentMonthly(offer.cycleMonths, offer.price))
+    .map((offer) => cycleMonthly(offer.cycleMonths, offer.cycleDays, offer.price))
     .filter((value): value is number => value !== null)
   const lowestMonthly = monthlyOffers.length > 0 ? Math.min(...monthlyOffers) : null
 
@@ -44,7 +44,7 @@ export function ComparePlan({
             {plan.subscribed ? <span className="badge ok">我在用</span> : null}
           </h3>
           <p>
-            {cycleLabel(plan.cycleMonths)}
+            {cycleLabel(plan.cycleMonths, plan.cycleDays)}
             {plan.listPrice > 0 ? ` · 标价 ${formatCNY(plan.listPrice)}` : ' · 未填标价'}
             {plan.note ? ` · ${plan.note}` : ''}
           </p>
@@ -67,7 +67,7 @@ export function ComparePlan({
           <strong>{mySub.platform ?? '平台未记录'}</strong>
           <span className="my-price">
             {mySub.lastPayment ? formatCNY(mySub.lastPayment.amount) : '未记录支付'}
-            <small> / {cycleLabel(plan.cycleMonths)}</small>
+            <small> / {cycleLabel(plan.cycleMonths, plan.cycleDays)}</small>
           </span>
           {myMonthly !== null ? (
             <span className="my-monthly">≈ {formatCNY(myMonthly)}/月</span>

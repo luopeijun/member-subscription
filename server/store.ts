@@ -1,5 +1,5 @@
 import { db } from './db'
-import { addMonths, daysBetween, pad2, todayISO } from './util'
+import { addDays, addMonths, daysBetween, pad2, todayISO } from './util'
 import { DAYS_PER_MONTH } from '../shared/duration'
 
 type ServiceRow = {
@@ -13,6 +13,7 @@ type PlanRow = {
   service_id: number
   name: string
   cycle_months: number
+  cycle_days: number | null
   list_price: number
   note: string | null
   service_name: string
@@ -75,6 +76,7 @@ type SnapshotRow = {
   service_name: string
   plan_name: string
   cycle_months: number
+  cycle_days: number | null
 }
 
 type JointQuoteRow = {
@@ -93,6 +95,7 @@ type JointQuoteItemRow = {
   service_name: string
   plan_name: string
   plan_cycle_months: number
+  plan_cycle_days: number | null
 }
 
 export function buildState() {
@@ -102,7 +105,7 @@ export function buildState() {
 
   const planRows = db
     .prepare(
-      `SELECT p.id, p.service_id, p.name, p.cycle_months, p.list_price, p.note,
+      `SELECT p.id, p.service_id, p.name, p.cycle_months, p.cycle_days, p.list_price, p.note,
         s.name AS service_name, s.category AS category,
         EXISTS(
           SELECT 1 FROM subscriptions sub
@@ -168,7 +171,7 @@ export function buildState() {
 
   const snapshotRows = db
     .prepare(
-      `SELECT ps.id, ps.plan_id, ps.captured_at, ps.price, ps.cycle_months, ps.platform, ps.note,
+      `SELECT ps.id, ps.plan_id, ps.captured_at, ps.price, ps.cycle_months, ps.cycle_days, ps.platform, ps.note,
         s.name AS service_name, pl.name AS plan_name
       FROM price_snapshots ps
       JOIN plans pl ON pl.id = ps.plan_id
@@ -189,7 +192,8 @@ export function buildState() {
     .prepare(
       `SELECT jqi.joint_quote_id, jqi.subscription_id,
         jqi.duration_days,
-        s.name AS service_name, pl.name AS plan_name, pl.cycle_months AS plan_cycle_months
+        s.name AS service_name, pl.name AS plan_name, pl.cycle_months AS plan_cycle_months,
+        pl.cycle_days AS plan_cycle_days
       FROM joint_quote_items jqi
       JOIN subscriptions sub ON sub.id = jqi.subscription_id
       JOIN plans pl ON pl.id = sub.plan_id
@@ -220,11 +224,17 @@ export function buildState() {
     const last = payments.at(-1) ?? null
     const prev = payments.at(-2) ?? null
     const cycle = plan?.cycle_months ?? 12
+    const cycleDays = plan?.cycle_days ?? null
 
     // 想买还没付款，既没有到期日，也不该按开始日期推算下一次扣款。
     const planned = sub.status === 'planned'
+    const baseDate = last?.paid_at ?? sub.started_at
     const computedNext =
-      !planned && cycle > 0 ? addMonths(last?.paid_at ?? sub.started_at, cycle) : null
+      !planned && cycleDays !== null && cycleDays > 0
+        ? addDays(baseDate, cycleDays)
+        : !planned && cycle > 0
+          ? addMonths(baseDate, cycle)
+          : null
     const nextRenewalAt = planned ? null : sub.next_renewal_override || computedNext
     const daysLeft = nextRenewalAt ? daysBetween(today, nextRenewalAt) : null
     // 状态跟着日期走：过了到期日就是已过期，续费把日期推后会自然恢复活跃。
@@ -240,7 +250,11 @@ export function buildState() {
     // plan's own cycle (e.g. a 1-month perk on an annual plan), so fall back to
     // the payment's own duration before the plan cycle.
     const effectiveMonths =
-      last && last.duration_days !== null ? last.duration_days / DAYS_PER_MONTH : cycle
+      last && last.duration_days !== null
+        ? last.duration_days / DAYS_PER_MONTH
+        : cycleDays !== null && cycleDays > 0
+          ? cycleDays / DAYS_PER_MONTH
+          : cycle
     const annualized =
       effectiveMonths > 0 && last
         ? Math.round((last.amount * 12) / effectiveMonths)
@@ -258,6 +272,7 @@ export function buildState() {
       category: plan?.category ?? '其他',
       planName: plan?.name ?? '未知套餐',
       cycleMonths: cycle,
+      cycleDays,
       listPrice: plan?.list_price ?? 0,
       platform: sub.platform,
       account: sub.account,
@@ -351,6 +366,7 @@ export function buildState() {
       category: plan.category,
       name: plan.name,
       cycleMonths: plan.cycle_months,
+      cycleDays: plan.cycle_days,
       listPrice: plan.list_price,
       note: plan.note,
       subscribed: activePlanIds.has(plan.id),
@@ -389,6 +405,7 @@ export function buildState() {
       serviceName: snapshot.service_name,
       planName: snapshot.plan_name,
       cycleMonths: snapshot.cycle_months,
+      cycleDays: snapshot.cycle_days,
       capturedAt: snapshot.captured_at,
       price: snapshot.price,
       platform: snapshot.platform,
@@ -407,7 +424,9 @@ export function buildState() {
         const effectiveMonths = latest
           ? latest.duration_days !== null
             ? latest.duration_days / DAYS_PER_MONTH
-            : item.plan_cycle_months
+            : item.plan_cycle_days !== null && item.plan_cycle_days > 0
+              ? item.plan_cycle_days / DAYS_PER_MONTH
+              : item.plan_cycle_months
           : 0
         return {
           subscriptionId: item.subscription_id,

@@ -3,6 +3,9 @@ import { api } from '@/api'
 import type { AppState, SavedHandler, Subscription } from '@/types'
 import { Modal } from '@/components/Modal/Modal'
 import { toMajor, toMinor } from '@shared/money'
+import { addDaysISO, DURATION_PRESETS } from '@shared/duration'
+import { clampDurationDays } from '@/utils/duration'
+import './PaymentForm.scss'
 
 /* ---------------------------------- 支付表单 --------------------------------- */
 
@@ -22,12 +25,14 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
     return initialSub.listPrice ? String(toMajor(initialSub.listPrice)) : ''
   })
   const [paidAt, setPaidAt] = useState(state.today)
+  const [durationDays, setDurationDays] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const selectSubscription = (id: number) => {
     setSubId(id)
+    setDurationDays('')
     const target = state.subscriptions.find((item) => item.id === id)
     if (!target) return
     if (target.lastPayment) {
@@ -38,6 +43,21 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
       setAmount('')
     }
   }
+
+  const target = state.subscriptions.find((item) => item.id === subId)
+  const parsedDuration = Number(durationDays)
+  const duration =
+    durationDays.trim() !== '' && Number.isFinite(parsedDuration)
+      ? clampDurationDays(durationDays)
+      : null
+  const base =
+    target &&
+    target.status !== 'planned' &&
+    target.nextRenewalAt &&
+    target.nextRenewalAt > paidAt
+      ? target.nextRenewalAt
+      : paidAt
+  const preview = duration !== null ? addDaysISO(base, duration) : null
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -51,6 +71,13 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
       setError('请填写支付金额')
       return
     }
+    if (
+      durationDays.trim() !== '' &&
+      (!Number.isFinite(parsedDuration) || parsedDuration < 1)
+    ) {
+      setError('续费时长至少为 1 天')
+      return
+    }
 
     setBusy(true)
     try {
@@ -59,6 +86,7 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
         body: JSON.stringify({
           paidAt,
           amount: toMinor(amountNumber),
+          durationDays: duration,
           note: note.trim() || null,
         }),
       })
@@ -77,7 +105,7 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
         subscription
           ? subscription.status === 'planned'
             ? '记一笔购买'
-            : '记录续费'
+            : '记一笔续费'
           : '记一笔支付'
       }
       subtitle={
@@ -118,6 +146,34 @@ export function PaymentForm({ state, subscription, onClose, onSaved }: PaymentFo
           <div className="field">
             <label>支付日期</label>
             <input type="date" value={paidAt} onChange={(event) => setPaidAt(event.target.value)} />
+          </div>
+          <div className="field span-2">
+            <label>这次买到的时长（天，选填）</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={durationDays}
+              placeholder="留空则按套餐周期自动推算"
+              onChange={(event) => setDurationDays(event.target.value)}
+            />
+            <div className="duration-presets">
+              {DURATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.days}
+                  type="button"
+                  className="btn sm"
+                  onClick={() => setDurationDays(String(preset.days))}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <p className="duration-hint">
+              {preview
+                ? `按 ${duration} 天计算，预计下次续费日 ${preview}。`
+                : '留空时按套餐计费周期推算；想买会员记录支付后会自动转为活跃。'}
+            </p>
           </div>
           <div className="field span-2">
             <label>备注</label>

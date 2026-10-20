@@ -71,11 +71,25 @@ function normalizeStatus(value: unknown): string {
   return 'active'
 }
 
-const CYCLE_MONTHS = new Set([-1, 0, 1, 3, 6, 12])
+const CYCLE_MONTHS = new Set([-1, 0, 1, 3, 6, 12, 24])
 
 function normalizeCycle(value: unknown): number {
   const months = integer(value, '套餐周期', -1, 120)
   return CYCLE_MONTHS.has(months) ? months : 12
+}
+
+function normalizeCycleDays(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  return integer(value, '套餐周期天数', 1, 3650)
+}
+
+function normalizeCyclePair(
+  monthsValue: unknown,
+  daysValue: unknown,
+): { cycleMonths: number; cycleDays: number | null } {
+  const cycleDays = normalizeCycleDays(daysValue)
+  if (cycleDays !== null) return { cycleMonths: 0, cycleDays }
+  return { cycleMonths: normalizeCycle(monthsValue), cycleDays: null }
 }
 
 export function exportAll() {
@@ -111,7 +125,7 @@ export function exportAll() {
       .all(),
     plans: db
       .prepare(
-        'SELECT id, service_id, name, cycle_months, list_price, note, created_at FROM plans ORDER BY id',
+        'SELECT id, service_id, name, cycle_months, cycle_days, list_price, note, created_at FROM plans ORDER BY id',
       )
       .all(),
     subscriptions: db
@@ -137,7 +151,8 @@ export function exportAll() {
       .all(),
     snapshots: db
       .prepare(
-        `SELECT id, plan_id, captured_at, price, cycle_months, platform, note, created_at
+        `SELECT id, plan_id, captured_at, price, cycle_months, cycle_days,
+          platform, note, created_at
          FROM price_snapshots ORDER BY id`,
       )
       .all(),
@@ -188,7 +203,10 @@ export function importAll(payload: unknown): ImportSummary {
   const run = db.transaction(() => {
     const serviceMap = new Map<number, number>()
     const planMap = new Map<number, number>()
-    const planCycleMap = new Map<number, number>()
+    const planCycleMap = new Map<
+      number,
+      { cycleMonths: number; cycleDays: number | null }
+    >()
     const subscriptionMap = new Map<number, number>()
 
     const findService = db.prepare('SELECT id FROM services WHERE name = ? COLLATE NOCASE')
@@ -197,11 +215,13 @@ export function importAll(payload: unknown): ImportSummary {
     )
     const findPlan = db.prepare(
       `SELECT id FROM plans
-       WHERE service_id = ? AND name = ? COLLATE NOCASE AND cycle_months = ?`,
+       WHERE service_id = ? AND name = ? COLLATE NOCASE AND cycle_months = ?
+         AND IFNULL(cycle_days, -1) = IFNULL(?, -1)`,
     )
     const insertPlan = db.prepare(
-      `INSERT INTO plans (service_id, name, cycle_months, list_price, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO plans
+        (service_id, name, cycle_months, cycle_days, list_price, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertSubscription = db.prepare(
       `INSERT INTO subscriptions
@@ -221,8 +241,9 @@ export function importAll(payload: unknown): ImportSummary {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertSnapshot = db.prepare(
-      `INSERT INTO price_snapshots (plan_id, captured_at, price, cycle_months, platform, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO price_snapshots
+        (plan_id, captured_at, price, cycle_months, cycle_days, platform, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertJointQuote = db.prepare(
       `INSERT INTO joint_quotes (captured_at, total, cycle_months, platform, note, created_at)
@@ -256,12 +277,15 @@ export function importAll(payload: unknown): ImportSummary {
         throw new HttpError(400, '套餐引用了不存在的服务')
       }
       const name = requiredText(row.name, '套餐名称', 80)
-      const cycleMonths = normalizeCycle(row.cycle_months)
+      const cycle = normalizeCyclePair(row.cycle_months, row.cycle_days)
       const listPrice = integer(row.list_price ?? 0, '套餐标价', 0)
       const note = optionalText(row.note)
-      const existing = findPlan.get(serviceId, name, cycleMonths) as
-        | { id: number }
-        | undefined
+      const existing = findPlan.get(
+        serviceId,
+        name,
+        cycle.cycleMonths,
+        cycle.cycleDays,
+      ) as { id: number } | undefined
 
       if (existing) {
         planMap.set(oldId, existing.id)
@@ -269,7 +293,8 @@ export function importAll(payload: unknown): ImportSummary {
         const info = insertPlan.run(
           serviceId,
           name,
-          cycleMonths,
+          cycle.cycleMonths,
+          cycle.cycleDays,
           listPrice,
           note,
           createdStamp(row.created_at),
@@ -277,7 +302,7 @@ export function importAll(payload: unknown): ImportSummary {
         planMap.set(oldId, Number(info.lastInsertRowid))
         summary.plansAdded += 1
       }
-      planCycleMap.set(oldId, cycleMonths)
+      planCycleMap.set(oldId, cycle)
     }
 
     for (const row of subscriptions) {
@@ -400,14 +425,20 @@ export function importAll(payload: unknown): ImportSummary {
       if (!planId) {
         throw new HttpError(400, '报价引用了不存在的套餐')
       }
-      const cycleMonths = normalizeCycle(
-        row.cycle_months ?? planCycleMap.get(oldPlanId) ?? 12,
+      const fallbackCycle = planCycleMap.get(oldPlanId) ?? {
+        cycleMonths: 12,
+        cycleDays: null,
+      }
+      const cycle = normalizeCyclePair(
+        row.cycle_months ?? fallbackCycle.cycleMonths,
+        row.cycle_days ?? fallbackCycle.cycleDays,
       )
       insertSnapshot.run(
         planId,
         date(row.captured_at, '报价日期'),
         integer(row.price, '报价价格', 0),
-        cycleMonths,
+        cycle.cycleMonths,
+        cycle.cycleDays,
         optionalText(row.platform, 60),
         optionalText(row.note),
         createdStamp(row.created_at),

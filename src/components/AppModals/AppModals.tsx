@@ -28,10 +28,18 @@ export function AppModals({ state, modal, onClose, onSaved }: AppModalsProps) {
 
   switch (modal.kind) {
     case 'add':
-      return <SubscriptionForm state={state} onClose={onClose} onSaved={onSaved} />
+      return (
+        <SubscriptionForm
+          key="add"
+          state={state}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
+      )
     case 'edit':
       return (
         <SubscriptionForm
+          key={`edit-${modal.subscription.id}`}
           state={state}
           editing={modal.subscription}
           onClose={onClose}
@@ -41,6 +49,7 @@ export function AppModals({ state, modal, onClose, onSaved }: AppModalsProps) {
     case 'renew':
       return (
         <PaymentForm
+          key={`renew-${modal.subscription.id}`}
           state={state}
           subscription={modal.subscription}
           onClose={onClose}
@@ -48,12 +57,27 @@ export function AppModals({ state, modal, onClose, onSaved }: AppModalsProps) {
         />
       )
     case 'jointRenew':
-      return <JointRenewForm state={state} onClose={onClose} onSaved={onSaved} />
+      return (
+        <JointRenewForm
+          key="jointRenew"
+          state={state}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
+      )
     case 'payment':
-      return <PaymentForm state={state} onClose={onClose} onSaved={onSaved} />
+      return (
+        <PaymentForm
+          key="payment"
+          state={state}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
+      )
     case 'snapshot':
       return (
         <SnapshotForm
+          key={`snapshot-${modal.plan.id}`}
           plan={modal.plan}
           today={state.today}
           onClose={onClose}
@@ -61,8 +85,15 @@ export function AppModals({ state, modal, onClose, onSaved }: AppModalsProps) {
         />
       )
     case 'plan':
-      return <PlanForm state={state} onClose={onClose} onSaved={onSaved} />
+      return <PlanForm key="plan" state={state} onClose={onClose} onSaved={onSaved} />
     case 'jointQuote':
-      return <JointQuoteForm state={state} onClose={onClose} onSaved={onSaved} />
+      return (
+        <JointQuoteForm
+          key="jointQuote"
+          state={state}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
+      )
   }
 }

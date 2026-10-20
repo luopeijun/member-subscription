@@ -26,6 +26,7 @@ db.exec(`
     service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     cycle_months INTEGER NOT NULL,
+    cycle_days INTEGER,
     list_price INTEGER NOT NULL DEFAULT 0,
     note TEXT,
     created_at TEXT NOT NULL
@@ -72,6 +73,7 @@ db.exec(`
     captured_at TEXT NOT NULL,
     price INTEGER NOT NULL,
     cycle_months INTEGER NOT NULL DEFAULT 0,
+    cycle_days INTEGER,
     platform TEXT,
     note TEXT,
     created_at TEXT NOT NULL
@@ -261,6 +263,16 @@ if (!snapshotColumns.some((column) => column.name === 'cycle_months')) {
        12
      )`,
   )
+}
+
+const planColumns = db.prepare('PRAGMA table_info(plans)').all() as {
+  name: string
+}[]
+if (!planColumns.some((column) => column.name === 'cycle_days')) {
+  db.exec('ALTER TABLE plans ADD COLUMN cycle_days INTEGER')
+}
+if (!snapshotColumns.some((column) => column.name === 'cycle_days')) {
+  db.exec('ALTER TABLE price_snapshots ADD COLUMN cycle_days INTEGER')
 }
 
 // Joint members used to share one bundle-wide cycle. Each member now carries

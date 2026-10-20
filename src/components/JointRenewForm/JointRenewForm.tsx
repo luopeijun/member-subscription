@@ -176,10 +176,14 @@ export function JointRenewForm({ state, onClose, onSaved }: JointRenewFormProps)
             <div className="joint-members">
               {selectedMembers.map((member, index) => {
                 const isMain = member.id === mainId
-                const nextDate = addDaysISO(
-                  member.sub.nextRenewalAt ?? paidAt,
-                  member.days,
-                )
+                const currentNext = member.sub.nextRenewalAt
+                const base =
+                  member.sub.status !== 'planned' &&
+                  currentNext &&
+                  currentNext > paidAt
+                    ? currentNext
+                    : paidAt
+                const nextDate = addDaysISO(base, member.days)
                 return (
                   <div key={member.id} className="joint-member picked">
                     <div className="joint-member-main">
@@ -193,10 +197,15 @@ export function JointRenewForm({ state, onClose, onSaved }: JointRenewFormProps)
                             {member.sub.planName} · 还没买，从 {formatDate(paidAt)} 起{' '}
                             {member.days} 天
                           </>
-                        ) : (
+                        ) : currentNext && currentNext > paidAt ? (
                           <>
                             {member.sub.planName} · 到期{' '}
-                            {formatDate(member.sub.nextRenewalAt)} → {formatDate(nextDate)}
+                            {formatDate(currentNext)} → {formatDate(nextDate)}
+                          </>
+                        ) : (
+                          <>
+                            {member.sub.planName} · 已过期，从 {formatDate(paidAt)} 起{' '}
+                            {member.days} 天 → {formatDate(nextDate)}
                           </>
                         )}
                       </span>
