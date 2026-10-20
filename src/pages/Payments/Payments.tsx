@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { AppState, JointRenewal, Payment } from '@/types'
 import { formatCNY } from '@shared/money'
-import { formatDuration } from '@shared/duration'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import { Pagination } from '@/components/Pagination/Pagination'
 import { SearchBox } from '@/components/SearchBox/SearchBox'
-import { formatDate } from '@/utils/format'
+import { JointRenewalCard } from './JointRenewalCard'
+import { PaymentRow } from './PaymentRow'
 import './Payments.scss'
 
 type PaymentsProps = {
@@ -135,43 +135,11 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
               <h3 className="section-title">联合续费</h3>
               <div className="joint-renewal-list">
                 {jointRenewals.map((renewal) => (
-                  <article className="card joint-renewal-card" key={renewal.id}>
-                    <div className="joint-renewal-head">
-                      <div>
-                        <strong>
-                          {formatDate(renewal.paidAt)} · {renewal.members.length} 个会员
-                        </strong>
-                        <span>合计 {formatCNY(renewal.total)}</span>
-                      </div>
-                      <span className="badge joint">
-                        {renewal.costMode === 'split' ? '均分' : '主会员承担'}
-                      </span>
-                    </div>
-                    <div className="joint-renewal-members">
-                      {renewal.members.map((member) => (
-                        <span className="joint-renewal-member" key={member.subscriptionId}>
-                          {member.serviceName}
-                          <em>
-                            {formatDuration(member.durationDays)} ·{' '}
-                            {formatCNY(member.amount)}
-                          </em>
-                        </span>
-                      ))}
-                    </div>
-                    <div className="joint-renewal-foot">
-                      <span>
-                        费用归属：{renewal.mainServiceName ?? '已删除会员'} ·{' '}
-                        {renewal.costMode === 'split' ? '均分' : '主会员承担'}
-                        {renewal.note ? ` · ${renewal.note}` : ''}
-                      </span>
-                      <button
-                        className="btn sm danger"
-                        onClick={() => onDeleteJointRenewal(renewal)}
-                      >
-                        删除记录
-                      </button>
-                    </div>
-                  </article>
+                  <JointRenewalCard
+                    key={renewal.id}
+                    renewal={renewal}
+                    onDelete={onDeleteJointRenewal}
+                  />
                 ))}
               </div>
             </section>
@@ -188,20 +156,7 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
                   <span />
                 </div>
                 {pageItems.map((payment) => (
-                  <div className="pay-row" key={payment.id}>
-                    <span className="pay-date nowrap">{payment.paidAt}</span>
-                    <div className="pay-member">
-                      <div className="cell-strong">{payment.serviceName}</div>
-                      <div className="cell-sub">{payment.planName}</div>
-                    </div>
-                    <span className="pay-amount num nowrap">{formatCNY(payment.amount)}</span>
-                    <span className="pay-note muted">{payment.note ?? '—'}</span>
-                    <span className="pay-actions num">
-                      <button className="btn sm danger" onClick={() => onDelete(payment)}>
-                        删除
-                      </button>
-                    </span>
-                  </div>
+                  <PaymentRow key={payment.id} payment={payment} onDelete={onDelete} />
                 ))}
               </div>
               <Pagination

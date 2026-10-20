@@ -1,0 +1,53 @@
+.joint-renewal-card {
+  padding: 14px 16px;
+}
+
+.joint-renewal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.joint-renewal-head strong {
+  display: block;
+  font-size: 14px;
+}
+
+.joint-renewal-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.joint-renewal-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.joint-renewal-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #f6f7fa;
+  font-size: 12px;
+}
+
+.joint-renewal-member em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.joint-renewal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
