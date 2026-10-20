@@ -12,8 +12,11 @@ export function PaymentRow({ payment, onDelete }: PaymentRowProps) {
     <div className="pay-row">
       <span className="pay-date nowrap">{payment.paidAt}</span>
       <div className="pay-member">
-        <div className="cell-strong">{payment.serviceName}</div>
-        <div className="cell-sub">{payment.planName}</div>
+        <span className="pay-service">{payment.serviceName}</span>
+        <span className="pay-member-sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="pay-plan">{payment.planName}</span>
       </div>
       <span className="pay-amount num nowrap">{formatCNY(payment.amount)}</span>
       <span className="pay-note muted">{payment.note ?? '—'}</span>

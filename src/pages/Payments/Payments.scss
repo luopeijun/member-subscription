@@ -1,3 +1,9 @@
+.payments-page {
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
 .pay-list {
   display: flex;
   flex-direction: column;
@@ -10,10 +16,10 @@
 
 .pay-head {
   display: grid;
-  grid-template-columns: 100px minmax(140px, 1.2fr) 110px minmax(120px, 1fr) 64px;
-  gap: 14px;
+  grid-template-columns: 92px minmax(160px, 220px) 100px minmax(120px, 1fr) 56px;
+  gap: 10px;
   align-items: center;
-  padding: 10px 16px;
+  padding: 8px 14px;
   background: #fafbfc;
   border-bottom: 1px solid var(--line);
   font-size: 11px;

@@ -112,7 +112,7 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
   const hasMatches = jointRenewals.length > 0 || list.length > 0
 
   return (
-    <div className="stack">
+    <div className="stack payments-page">
       <div className="toolbar">
         <div className="inline-stats">
           <span>
