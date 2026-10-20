@@ -111,7 +111,7 @@ export function Payments({ state, onDelete, onDeleteJointRenewal }: PaymentsProp
   const hasMatches = jointRenewals.length > 0 || list.length > 0
 
   return (
-    <div className="stack payments-page">
+    <div className="stack">
       <div className="toolbar">
         <div className="inline-stats">
           <span>
