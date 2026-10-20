@@ -1,0 +1,96 @@
+.plan-block {
+  padding: 18px 20px;
+  border-top: 1px solid #f0f2f6;
+}
+
+.plan-block:first-child {
+  border-top: 0;
+}
+
+.plan-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.plan-head h3 {
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.plan-head p {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.my-purchase {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.my-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent-deep);
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.my-price {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.my-price small {
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.my-monthly {
+  color: var(--accent-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.my-date {
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-left: auto;
+}
+
+.empty-my {
+  background: #f8f9fc;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.offer-list {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.offer-empty {
+  padding: 12px 2px 2px;
+  font-size: 12.5px;
+}
+
+@media (max-width: 980px) {
+  .my-date {
+    margin-left: 0;
+  }
+}

@@ -1,0 +1,65 @@
+.joint-quote-card {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.joint-quote-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.joint-quote-head strong {
+  display: block;
+  font-size: 14px;
+}
+
+.joint-quote-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.joint-quote-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.joint-quote-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #f6f7fa;
+  font-size: 12px;
+}
+
+.joint-quote-item em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.joint-quote-compare {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.quote-compare-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.quote-compare-cell strong {
+  color: var(--text);
+  font-size: 14px;
+}
