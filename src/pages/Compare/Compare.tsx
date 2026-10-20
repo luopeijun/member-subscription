@@ -11,7 +11,7 @@ import './Compare.scss'
 
 type CompareProps = {
   state: AppState
-  onAddPlan: () => void
+  onNewQuote: () => void
   onSnapshot: (plan: Plan) => void
   onDeletePlan: (plan: Plan) => void
   onDeleteSnapshot: (snapshot: Snapshot) => void
@@ -21,7 +21,7 @@ type CompareProps = {
 
 export function Compare({
   state,
-  onAddPlan,
+  onNewQuote,
   onSnapshot,
   onDeletePlan,
   onDeleteSnapshot,
@@ -61,8 +61,8 @@ export function Compare({
           <button className="btn" onClick={onAddJointQuote}>
             记录联合报价
           </button>
-          <button className="btn primary" onClick={onAddPlan}>
-            + 添加候选套餐
+          <button className="btn primary" onClick={onNewQuote}>
+            + 记录平台报价
           </button>
         </div>
       </div>
@@ -71,6 +71,8 @@ export function Compare({
         每个套餐下面，上面一行是<strong>你当前购买的平台和价格</strong>，
         下面是我录入的其他平台报价。差价按<strong>等效月成本</strong>计算（年付 ÷ 12）；
         如果报价填了会员到期日，就按记录日期到到期日的实际天数折算。
+        第一次记录某个套餐时，直接点右上角<strong>「记录平台报价」</strong>，
+        套餐会跟着第一条报价一起创建；之后在套餐上点同一个按钮就是追加报价。
         合租、代充、需要额外条件的情况写在「怎么买」里。
         捆绑装则记成<strong>联合报价</strong>，按每个会员各自拿到的天数算出当前组合要花多少钱，
         再和捆绑包总价对比。
@@ -111,10 +113,10 @@ export function Compare({
           ) : (
             <EmptyState
               title="还没有可比较的套餐"
-              description="点「添加候选套餐」录入同一服务的不同套餐或不同价格档位，再记录每个平台的报价，就能看到换平台是否划算。"
+              description="点「记录平台报价」录入同一服务的不同套餐或不同价格档位，保存后就能看到换平台是否划算。"
               action={
-                <button className="btn primary" onClick={onAddPlan}>
-                  添加候选套餐
+                <button className="btn primary" onClick={onNewQuote}>
+                  记录平台报价
                 </button>
               }
             />

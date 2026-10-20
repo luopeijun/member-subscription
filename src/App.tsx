@@ -117,7 +117,7 @@ export default function App() {
   }
 
   const handleDeletePlan = (plan: Plan) => {
-    if (!window.confirm(`删除候选套餐「${plan.serviceName} · ${plan.name}」及其比价记录？`)) {
+    if (!window.confirm(`删除套餐「${plan.serviceName} · ${plan.name}」及其比价记录？`)) {
       return
     }
     void remove(`/plans/${plan.id}`, '已删除套餐')
@@ -258,8 +258,8 @@ export default function App() {
         {tab === 'compare' ? (
           <Compare
             state={state}
-            onAddPlan={() => setModal({ kind: 'plan' })}
-            onSnapshot={(plan) => setModal({ kind: 'snapshot', plan })}
+            onNewQuote={() => setModal({ kind: 'newQuote' })}
+            onSnapshot={(plan) => setModal({ kind: 'quote', plan })}
             onDeletePlan={handleDeletePlan}
             onDeleteSnapshot={handleDeleteSnapshot}
             onAddJointQuote={() => setModal({ kind: 'jointQuote' })}

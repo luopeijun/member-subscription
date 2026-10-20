@@ -115,6 +115,50 @@ function parseCycle(body: Record<string, unknown>, fallback: Cycle): Cycle {
   return { cycleMonths: cycle(fallback.cycleMonths), cycleDays: null }
 }
 
+type QuoteInput = {
+  capturedAt: string
+  expiresAt: string | null
+  price: number
+  cycleMonths: number
+  cycleDays: number | null
+  platform: string
+  note: string | null
+}
+
+function readQuote(body: Record<string, unknown>, fallback: Cycle): QuoteInput {
+  const capturedAt = date(body.capturedAt, '记录日期')
+  const expiresAt = maybeDate(body.expiresAt, '到期日')
+  if (expiresAt && expiresAt <= capturedAt) {
+    throw new HttpError(400, '到期日需要晚于记录日期')
+  }
+  return {
+    capturedAt,
+    expiresAt,
+    price: integer(body.price, '价格', 0, 1_000_000_000_000),
+    ...parseCycle(body, fallback),
+    platform: text(body.platform, '平台', 60),
+    note: optionalText(body.note, 300),
+  }
+}
+
+function insertPriceSnapshot(planId: number, quote: QuoteInput) {
+  db.prepare(
+    `INSERT INTO price_snapshots
+      (plan_id, captured_at, expires_at, price, cycle_months, cycle_days, platform, note, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    planId,
+    quote.capturedAt,
+    quote.expiresAt,
+    quote.price,
+    quote.cycleMonths,
+    quote.cycleDays,
+    quote.platform,
+    quote.note,
+    nowISO(),
+  )
+}
+
 function idParam(value: string, label: string): number {
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -662,15 +706,28 @@ apiRouter.post(
     const listPrice = integer(body.listPrice ?? 0, '标价', 0, 1_000_000_000_000)
     const note = optionalText(body.note, 300)
 
+    const quoteBody = body.quote
+    let quote: QuoteInput | null = null
+    if (quoteBody !== null && quoteBody !== undefined) {
+      if (typeof quoteBody !== 'object' || Array.isArray(quoteBody)) {
+        throw new HttpError(400, '平台报价格式不正确')
+      }
+      quote = readQuote(quoteBody as Record<string, unknown>, {
+        cycleMonths,
+        cycleDays,
+      })
+    }
+
     db.transaction(() => {
       const serviceId = upsertService(serviceName, category)
-      upsertPlan(serviceId, {
+      const planId = upsertPlan(serviceId, {
         name: planName,
         cycleMonths,
         cycleDays,
         listPrice,
         note,
       })
+      if (quote) insertPriceSnapshot(planId, quote)
     })()
 
     res.status(201).json(buildState())
@@ -705,34 +762,11 @@ apiRouter.post(
       | undefined
     if (!plan) throw new HttpError(404, '套餐不存在')
 
-    const capturedAt = date(body.capturedAt, '记录日期')
-    const expiresAt = maybeDate(body.expiresAt, '到期日')
-    if (expiresAt && expiresAt <= capturedAt) {
-      throw new HttpError(400, '到期日需要晚于记录日期')
-    }
-    const price = integer(body.price, '价格', 0, 1_000_000_000_000)
-    const { cycleMonths, cycleDays } = parseCycle(body, {
+    const quote = readQuote(body, {
       cycleMonths: plan.cycle_months,
       cycleDays: plan.cycle_days,
     })
-    const platform = text(body.platform, '平台', 60)
-    const note = optionalText(body.note, 300)
-
-    db.prepare(
-      `INSERT INTO price_snapshots
-        (plan_id, captured_at, expires_at, price, cycle_months, cycle_days, platform, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      planId,
-      capturedAt,
-      expiresAt,
-      price,
-      cycleMonths,
-      cycleDays,
-      platform,
-      note,
-      nowISO(),
-    )
+    insertPriceSnapshot(planId, quote)
 
     res.status(201).json(buildState())
   }),

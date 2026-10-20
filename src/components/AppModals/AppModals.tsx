@@ -2,8 +2,7 @@ import type { AppState, Plan, SavedHandler, Subscription } from '@/types'
 import { JointQuoteForm } from '@/components/JointQuoteForm/JointQuoteForm'
 import { JointRenewForm } from '@/components/JointRenewForm/JointRenewForm'
 import { PaymentForm } from '@/components/PaymentForm/PaymentForm'
-import { PlanForm } from '@/components/PlanForm/PlanForm'
-import { SnapshotForm } from '@/components/SnapshotForm/SnapshotForm'
+import { QuoteForm } from '@/components/QuoteForm/QuoteForm'
 import { SubscriptionForm } from '@/components/SubscriptionForm/SubscriptionForm'
 
 export type ModalState =
@@ -12,8 +11,8 @@ export type ModalState =
   | { kind: 'renew'; subscription: Subscription }
   | { kind: 'jointRenew' }
   | { kind: 'payment' }
-  | { kind: 'snapshot'; plan: Plan }
-  | { kind: 'plan' }
+  | { kind: 'quote'; plan: Plan }
+  | { kind: 'newQuote' }
   | { kind: 'jointQuote' }
 
 type AppModalsProps = {
@@ -74,18 +73,20 @@ export function AppModals({ state, modal, onClose, onSaved }: AppModalsProps) {
           onSaved={onSaved}
         />
       )
-    case 'snapshot':
+    case 'quote':
       return (
-        <SnapshotForm
-          key={`snapshot-${modal.plan.id}`}
+        <QuoteForm
+          key={`quote-${modal.plan.id}`}
+          state={state}
           plan={modal.plan}
-          today={state.today}
           onClose={onClose}
           onSaved={onSaved}
         />
       )
-    case 'plan':
-      return <PlanForm key="plan" state={state} onClose={onClose} onSaved={onSaved} />
+    case 'newQuote':
+      return (
+        <QuoteForm key="new-quote" state={state} onClose={onClose} onSaved={onSaved} />
+      )
     case 'jointQuote':
       return (
         <JointQuoteForm
