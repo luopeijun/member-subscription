@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '@/api'
-import type { AppState, SavedHandler, Subscription } from '@/types'
+import type { AppState, JointCostMode, SavedHandler, Subscription } from '@/types'
 import { PLATFORM_SUGGESTIONS } from '@/constants'
 import { Modal } from '@/components/Modal/Modal'
 import { formatCNY, toMinor } from '@shared/money'
@@ -24,10 +24,12 @@ type QuoteItemDraft = {
 
 export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps) {
   const [items, setItems] = useState<QuoteItemDraft[]>([])
+  const [mainId, setMainId] = useState<number | null>(null)
   const [picker, setPicker] = useState('')
   const [platform, setPlatform] = useState('')
   const [total, setTotal] = useState('')
   const [defaultDays, setDefaultDays] = useState(365)
+  const [costMode, setCostMode] = useState<JointCostMode>('split')
   const [capturedAt, setCapturedAt] = useState(state.today)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -46,28 +48,45 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
 
   const totalFen =
     total === '' || !Number.isFinite(Number(total)) ? 0 : toMinor(Number(total))
-  const entries = selected.map((item) => {
+  const totalDays = selected.reduce((sum, item) => sum + item.days, 0)
+  const amounts = selected.map((item) => {
+    if (costMode === 'main') return item.id === mainId ? totalFen : 0
+    if (totalDays <= 0) return 0
+    return Math.floor((totalFen * item.days) / totalDays)
+  })
+  if (costMode === 'split' && totalDays > 0) {
+    const mainIndex = selected.findIndex((item) => item.id === mainId)
+    if (mainIndex >= 0) {
+      const assigned = amounts.reduce((sum, amount) => sum + amount, 0)
+      amounts[mainIndex] += totalFen - assigned
+    }
+  }
+  const entries = selected.map((item, index) => {
     const monthly = monthlyEquivalent(item.sub)
     const currentCost =
       monthly !== null && item.days > 0
         ? Math.round((monthly * item.days) / DAYS_PER_MONTH)
         : null
-    return { ...item, monthly, currentCost }
+    return { ...item, monthly, currentCost, amount: amounts[index] ?? 0 }
   })
   const currentTotal = entries.reduce((sum, entry) => sum + (entry.currentCost ?? 0), 0)
   const excluded = entries.filter((entry) => entry.currentCost === null).length
   const diff = selected.length > 0 ? totalFen - currentTotal : null
+  const mainMember = selected.find((item) => item.id === mainId) ?? null
 
   const addMember = () => {
     const id = Number(picker)
     if (!id) return
     setItems((current) => [...current, { id, days: defaultDays }])
+    if (mainId === null) setMainId(id)
     setPicker('')
     setError(null)
   }
 
   const removeMember = (id: number) => {
-    setItems((current) => current.filter((item) => item.id !== id))
+    const next = items.filter((item) => item.id !== id)
+    setItems(next)
+    if (mainId === id) setMainId(next[0]?.id ?? null)
   }
 
   const updateItem = (id: number, days: number) => {
@@ -91,6 +110,10 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
       setError('请填写平台名称')
       return
     }
+    if (mainId === null) {
+      setError('请选择费用归属会员')
+      return
+    }
     if (total === '' || !Number.isFinite(Number(total)) || Number(total) < 0) {
       setError('请填写捆绑包总价')
       return
@@ -103,6 +126,8 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
         body: JSON.stringify({
           capturedAt,
           total: totalFen,
+          mainSubscriptionId: mainId,
+          costMode,
           platform: platform.trim(),
           note: note.trim() || null,
           items: selected.map((item) => ({
@@ -122,7 +147,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
   return (
     <Modal
       title="记录联合报价"
-      subtitle="一次买多个会员的总价，和同样时长下当前组合要花的钱对比"
+      subtitle="一次购买多个会员的捆绑总价，与相同服务时长下的当前组合成本对比"
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -150,7 +175,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
             </button>
           </div>
           <p className="joint-hint">
-            选择你现在持有的会员，再填每个会员这条报价能拿到多少天，用来算当前组合要花多少钱。
+            选择当前持有的会员，并填写每个会员在这条报价中的服务时长，用于计算当前组合成本。
           </p>
         </div>
 
@@ -184,8 +209,11 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
                     />
                     <span>天</span>
                   </div>
-                  <span className="joint-member-cost">
-                    {entry.currentCost === null ? '—' : formatCNY(entry.currentCost)}
+                  <span className="joint-member-amounts">
+                    <strong>分摊 {formatCNY(entry.amount)}</strong>
+                    <span>
+                      当前 {entry.currentCost === null ? '—' : formatCNY(entry.currentCost)}
+                    </span>
                   </span>
                   <button
                     type="button"
@@ -261,6 +289,33 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
             </div>
           </div>
           <div className="field">
+            <label>费用归属</label>
+            <select
+              value={costMode}
+              onChange={(event) => setCostMode(event.target.value as JointCostMode)}
+            >
+              <option value="split">均分（按天数）</option>
+              <option value="main">主会员承担</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>主会员</label>
+            <select
+              value={mainId ?? ''}
+              onChange={(event) =>
+                setMainId(event.target.value === '' ? null : Number(event.target.value))
+              }
+              disabled={selected.length === 0}
+            >
+              <option value="">选择费用归属会员</option>
+              {selected.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.sub.serviceName} · {item.sub.planName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
             <label>看到价格的日期</label>
             <input
               type="date"
@@ -269,13 +324,18 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
             />
           </div>
           <div className="field">
-            <label>怎么买 / 备注</label>
+            <label>购买方式 / 备注</label>
             <input
               value={note}
               placeholder="例如：代充；需要提供账号；含 4 个会员"
               onChange={(event) => setNote(event.target.value)}
             />
           </div>
+        </div>
+
+        <div className="joint-hint" style={{ marginTop: 10 }}>
+          费用归属只影响这条报价的成本分摊，不会生成支付记录。均分时按每个会员实际拿到的天数分摊，
+          余数记在主会员；选择「主会员承担」时全部记在主会员。
         </div>
 
         <div className="quote-preview">
@@ -299,6 +359,16 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
               <span className="badge muted">持平</span>
             )}
           </div>
+          <div className="quote-preview-row">
+            <span>费用归属</span>
+            <span>
+              {selected.length === 0 || mainId === null
+                ? '—'
+                : costMode === 'split'
+                  ? `按天数分摊 · 余数记在${mainMember?.sub.serviceName ?? '主会员'}`
+                  : `主会员承担 · ${mainMember?.sub.serviceName ?? '主会员'}`}
+            </span>
+          </div>
         </div>
 
         {excluded > 0 ? (
@@ -316,7 +386,9 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
           <button
             type="submit"
             className="btn primary"
-            disabled={busy || selected.length < 2 || !platform.trim()}
+            disabled={
+              busy || selected.length < 2 || mainId === null || !platform.trim()
+            }
           >
             {busy ? '保存中…' : '记录报价'}
           </button>

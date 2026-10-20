@@ -101,7 +101,8 @@ function normalizeCyclePair(
 export function exportAll() {
   const jointQuoteRows = db
     .prepare(
-      `SELECT id, captured_at, total, cycle_months, platform, note, created_at
+      `SELECT id, captured_at, total, cycle_months, main_subscription_id,
+        cost_mode, platform, note, created_at
        FROM joint_quotes ORDER BY id`,
     )
     .all() as { id: number }[]
@@ -252,8 +253,10 @@ export function importAll(payload: unknown): ImportSummary {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertJointQuote = db.prepare(
-      `INSERT INTO joint_quotes (captured_at, total, cycle_months, platform, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO joint_quotes
+        (captured_at, total, cycle_months, main_subscription_id, cost_mode,
+         platform, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     const insertJointQuoteItem = db.prepare(
       `INSERT INTO joint_quote_items
@@ -381,10 +384,23 @@ export function importAll(payload: unknown): ImportSummary {
       }
       if (items.length === 0) continue
 
+      const rawMainId = row.main_subscription_id
+      const importedMainId =
+        rawMainId === null || rawMainId === undefined
+          ? null
+          : (subscriptionMap.get(integer(rawMainId, '联合报价主会员', 1)) ?? null)
+      const mainSubscriptionId =
+        importedMainId !== null &&
+        items.some((item) => item.subscriptionId === importedMainId)
+          ? importedMainId
+          : (items[0]?.subscriptionId ?? null)
+
       const info = insertJointQuote.run(
         date(row.captured_at, '联合报价日期'),
         integer(row.total, '联合报价总额', 0),
         normalizeCycle(row.cycle_months ?? 0),
+        mainSubscriptionId,
+        row.cost_mode === 'main' ? 'main' : 'split',
         optionalText(row.platform, 60),
         optionalText(row.note),
         createdStamp(row.created_at),

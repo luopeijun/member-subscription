@@ -32,6 +32,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
   padding: 4px 8px;
   border-radius: 8px;
   background: #f6f7fa;
@@ -39,6 +40,7 @@
 }
 
 .joint-quote-item em {
+  min-width: 0;
   color: var(--muted);
   font-style: normal;
 }

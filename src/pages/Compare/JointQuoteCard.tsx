@@ -20,6 +20,9 @@ export function JointQuoteCard({ quote, onDelete }: JointQuoteCardProps) {
   const currentTotal = entries.reduce((sum, entry) => sum + (entry.currentCost ?? 0), 0)
   const excluded = entries.filter((entry) => entry.currentCost === null).length
   const diff = quote.items.length > 0 ? quote.total - currentTotal : null
+  const mainName =
+    quote.items.find((item) => item.subscriptionId === quote.mainSubscriptionId)
+      ?.serviceName ?? '已删除会员'
 
   return (
     <article className="joint-quote-card">
@@ -29,7 +32,8 @@ export function JointQuoteCard({ quote, onDelete }: JointQuoteCardProps) {
             {quote.platform ?? '未标注'} · {formatDay(quote.capturedAt)}
           </strong>
           <span>
-            {quote.items.length} 个会员 · 总价 {formatCNY(quote.total)}
+            {quote.items.length} 个会员 · 总价 {formatCNY(quote.total)} · 费用归属：
+            {mainName} · {quote.costMode === 'split' ? '均分' : '主会员承担'}
           </span>
         </div>
         <button className="btn sm danger" onClick={() => onDelete(quote)}>
@@ -45,7 +49,7 @@ export function JointQuoteCard({ quote, onDelete }: JointQuoteCardProps) {
             <span className="joint-quote-item" key={item.subscriptionId}>
               {item.serviceName}
               <em>
-                {formatDuration(item.durationDays)}
+                {formatDuration(item.durationDays)} · 分摊 {formatCNY(item.amount)}
                 {item.monthly === null ? '' : ` · 当前 ${formatCNY(item.monthly)}/月`}
               </em>
             </span>

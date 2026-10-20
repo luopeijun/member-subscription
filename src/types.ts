@@ -101,6 +101,7 @@ export type JointQuoteItem = {
   serviceName: string
   planName: string
   durationDays: number
+  amount: number
   monthly: number | null
 }
 
@@ -109,6 +110,8 @@ export type JointQuote = {
   capturedAt: string
   total: number
   cycleMonths: number
+  mainSubscriptionId: number | null
+  costMode: JointCostMode
   platform: string | null
   note: string | null
   items: JointQuoteItem[]

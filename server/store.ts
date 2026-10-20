@@ -85,6 +85,8 @@ type JointQuoteRow = {
   captured_at: string
   total: number
   cycle_months: number
+  main_subscription_id: number | null
+  cost_mode: string
   platform: string | null
   note: string | null
 }
@@ -97,6 +99,26 @@ type JointQuoteItemRow = {
   plan_name: string
   plan_cycle_months: number
   plan_cycle_days: number | null
+}
+
+function allocateJointQuoteAmounts(
+  total: number,
+  durations: number[],
+  mode: 'split' | 'main',
+  mainIndex: number,
+): number[] {
+  if (durations.length === 0) return []
+  const safeMainIndex =
+    mainIndex >= 0 && mainIndex < durations.length ? mainIndex : 0
+  if (mode === 'main') {
+    return durations.map((_, index) => (index === safeMainIndex ? total : 0))
+  }
+  const totalDays = durations.reduce((sum, days) => sum + days, 0)
+  if (totalDays <= 0) return durations.map(() => 0)
+  const amounts = durations.map((days) => Math.floor((total * days) / totalDays))
+  const assigned = amounts.reduce((sum, amount) => sum + amount, 0)
+  amounts[safeMainIndex] += total - assigned
+  return amounts
 }
 
 export function buildState() {
@@ -183,7 +205,8 @@ export function buildState() {
 
   const jointQuoteRows = db
     .prepare(
-      `SELECT jq.id, jq.captured_at, jq.total, jq.cycle_months, jq.platform, jq.note
+      `SELECT jq.id, jq.captured_at, jq.total, jq.cycle_months,
+        jq.main_subscription_id, jq.cost_mode, jq.platform, jq.note
       FROM joint_quotes jq
       ORDER BY jq.captured_at DESC, jq.id DESC`,
     )
@@ -413,35 +436,52 @@ export function buildState() {
       platform: snapshot.platform,
       note: snapshot.note,
     })),
-    jointQuotes: jointQuoteRows.map((quote) => ({
-      id: quote.id,
-      capturedAt: quote.captured_at,
-      total: quote.total,
-      cycleMonths: quote.cycle_months,
-      platform: quote.platform,
-      note: quote.note,
-      items: (jointQuoteItemsByQuote.get(quote.id) ?? []).map((item) => {
-        const payments = paymentsBySub.get(item.subscription_id) ?? []
-        const latest = payments.at(-1) ?? null
-        const effectiveMonths = latest
-          ? latest.duration_days !== null
-            ? latest.duration_days / DAYS_PER_MONTH
-            : item.plan_cycle_days !== null && item.plan_cycle_days > 0
-              ? item.plan_cycle_days / DAYS_PER_MONTH
-              : item.plan_cycle_months
-          : 0
-        return {
-          subscriptionId: item.subscription_id,
-          serviceName: item.service_name,
-          planName: item.plan_name,
-          durationDays: item.duration_days ?? quote.cycle_months * DAYS_PER_MONTH,
-          monthly:
-            latest && effectiveMonths > 0
-              ? Math.round(latest.amount / effectiveMonths)
-              : null,
-        }
-      }),
-    })),
+    jointQuotes: jointQuoteRows.map((quote) => {
+      const items = jointQuoteItemsByQuote.get(quote.id) ?? []
+      const mainIndex = items.findIndex(
+        (item) => item.subscription_id === quote.main_subscription_id,
+      )
+      const amounts = allocateJointQuoteAmounts(
+        quote.total,
+        items.map(
+          (item) => item.duration_days ?? quote.cycle_months * DAYS_PER_MONTH,
+        ),
+        quote.cost_mode === 'main' ? 'main' : 'split',
+        mainIndex,
+      )
+      return {
+        id: quote.id,
+        capturedAt: quote.captured_at,
+        total: quote.total,
+        cycleMonths: quote.cycle_months,
+        mainSubscriptionId: quote.main_subscription_id,
+        costMode: quote.cost_mode === 'main' ? 'main' : 'split',
+        platform: quote.platform,
+        note: quote.note,
+        items: items.map((item, index) => {
+          const payments = paymentsBySub.get(item.subscription_id) ?? []
+          const latest = payments.at(-1) ?? null
+          const effectiveMonths = latest
+            ? latest.duration_days !== null
+              ? latest.duration_days / DAYS_PER_MONTH
+              : item.plan_cycle_days !== null && item.plan_cycle_days > 0
+                ? item.plan_cycle_days / DAYS_PER_MONTH
+                : item.plan_cycle_months
+            : 0
+          return {
+            subscriptionId: item.subscription_id,
+            serviceName: item.service_name,
+            planName: item.plan_name,
+            durationDays: item.duration_days ?? quote.cycle_months * DAYS_PER_MONTH,
+            amount: amounts[index] ?? 0,
+            monthly:
+              latest && effectiveMonths > 0
+                ? Math.round(latest.amount / effectiveMonths)
+                : null,
+          }
+        }),
+      }
+    }),
     stats: {
       activeCount: active.length,
       annualized,

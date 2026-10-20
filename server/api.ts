@@ -789,12 +789,18 @@ apiRouter.post(
     const body = req.body ?? {}
     const capturedAt = date(body.capturedAt, '记录日期')
     const total = integer(body.total, '整条报价', 0, 1_000_000_000_000)
+    const mode = costMode(body.costMode)
     const platform = text(body.platform, '平台', 60)
     const note = optionalText(body.note, 300)
 
     const items = parseMembers(body.items, '报价会员')
     if (items.length < 2) {
       throw new HttpError(400, '联合报价至少需要两个会员')
+    }
+
+    const mainSubscriptionId = integer(body.mainSubscriptionId, '费用归属会员', 1)
+    if (!items.some((item) => item.subscriptionId === mainSubscriptionId)) {
+      throw new HttpError(400, '费用归属会员必须在报价会员中')
     }
 
     const exists = db.prepare('SELECT id FROM subscriptions WHERE id = ?')
@@ -812,10 +818,21 @@ apiRouter.post(
     db.transaction(() => {
       const info = db
         .prepare(
-          `INSERT INTO joint_quotes (captured_at, total, cycle_months, platform, note, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO joint_quotes
+            (captured_at, total, cycle_months, main_subscription_id, cost_mode,
+             platform, note, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(capturedAt, total, bundleMonths, platform, note, nowISO())
+        .run(
+          capturedAt,
+          total,
+          bundleMonths,
+          mainSubscriptionId,
+          mode,
+          platform,
+          note,
+          nowISO(),
+        )
       const quoteId = Number(info.lastInsertRowid)
       const insertItem = db.prepare(
         `INSERT INTO joint_quote_items

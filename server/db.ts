@@ -86,6 +86,8 @@ db.exec(`
     captured_at TEXT NOT NULL,
     total INTEGER NOT NULL,
     cycle_months INTEGER NOT NULL DEFAULT 0,
+    main_subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL,
+    cost_mode TEXT NOT NULL DEFAULT 'split',
     platform TEXT,
     note TEXT,
     created_at TEXT NOT NULL
@@ -342,4 +344,27 @@ db.exec(
          ) * 365.0 / 12
        )
    WHERE duration_days IS NULL`,
+)
+
+const jointQuoteColumns = db.prepare('PRAGMA table_info(joint_quotes)').all() as {
+  name: string
+}[]
+if (!jointQuoteColumns.some((column) => column.name === 'cost_mode')) {
+  db.exec("ALTER TABLE joint_quotes ADD COLUMN cost_mode TEXT NOT NULL DEFAULT 'split'")
+}
+if (!jointQuoteColumns.some((column) => column.name === 'main_subscription_id')) {
+  db.exec(
+    'ALTER TABLE joint_quotes ADD COLUMN main_subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL',
+  )
+}
+// 旧联合报价没有费用归属，默认按天数均分，并把第一条会员作为主会员。
+db.exec(
+  `UPDATE joint_quotes
+   SET main_subscription_id = (
+     SELECT subscription_id FROM joint_quote_items
+     WHERE joint_quote_items.joint_quote_id = joint_quotes.id
+     ORDER BY joint_quote_items.id
+     LIMIT 1
+   )
+   WHERE main_subscription_id IS NULL`,
 )
