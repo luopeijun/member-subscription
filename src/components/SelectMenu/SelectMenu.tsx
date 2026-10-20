@@ -30,7 +30,7 @@ export function SelectMenu({
   const [query, setQuery] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([])
   const listId = useId()
 
@@ -52,6 +52,7 @@ export function SelectMenu({
 
     const handlePointerDown = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) {
+        if (searchable) inputRef.current?.blur()
         setOpen(false)
         setQuery('')
       }
@@ -59,21 +60,29 @@ export function SelectMenu({
 
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [open])
+  }, [open, searchable])
 
   useEffect(() => {
     if (!open) return
     if (searchable) {
-      searchRef.current?.focus()
+      inputRef.current?.focus()
       return
     }
     optionRefs.current[selectedFilteredIndex >= 0 ? selectedFilteredIndex : 0]?.focus()
   }, [open, selectedFilteredIndex, searchable])
 
+  const focusTrigger = () => {
+    if (searchable) {
+      inputRef.current?.focus()
+    } else {
+      triggerRef.current?.focus()
+    }
+  }
+
   const close = (restoreFocus = false) => {
     setOpen(false)
     setQuery('')
-    if (restoreFocus) triggerRef.current?.focus()
+    if (restoreFocus) focusTrigger()
   }
 
   const choose = (next: string) => {
@@ -101,6 +110,7 @@ export function SelectMenu({
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {
       event.preventDefault()
+      event.stopPropagation()
       close(true)
     } else if (event.key === 'ArrowDown') {
       event.preventDefault()
@@ -113,9 +123,13 @@ export function SelectMenu({
     } else if (
       event.key === 'Enter' &&
       searchable &&
-      document.activeElement === searchRef.current
+      event.target === inputRef.current
     ) {
       event.preventDefault()
+      if (!open) {
+        setOpen(true)
+        return
+      }
       const first = filteredOptions[0]
       if (first) choose(first.value)
     }
@@ -126,44 +140,67 @@ export function SelectMenu({
       className={`select-menu ${size}${open ? ' open' : ''}${searchable ? ' searchable' : ''}`}
       ref={rootRef}
     >
-      <button
-        type="button"
-        className="select-trigger"
-        ref={triggerRef}
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={open ? listId : undefined}
-        onClick={() => {
-          if (open) {
-            close()
-          } else {
-            setOpen(true)
-          }
-        }}
-        onKeyDown={handleKeyDown}
-      >
-        <span className="select-value">{selected?.label ?? '请选择'}</span>
-        {selected?.meta ? <span className="select-meta">{selected.meta}</span> : null}
-        <span className="select-chevron" aria-hidden="true" />
-      </button>
+      {searchable ? (
+        <div className="select-input-wrap">
+          <input
+            ref={inputRef}
+            type="text"
+            className="select-trigger select-input"
+            value={open ? query : (selected?.label ?? '')}
+            placeholder={open ? searchPlaceholder : '请选择'}
+            aria-label={ariaLabel}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-controls={open ? listId : undefined}
+            autoComplete="off"
+            onFocus={() => {
+              if (!open) {
+                setOpen(true)
+                setQuery('')
+              }
+            }}
+            onClick={() => {
+              if (!open) {
+                setOpen(true)
+                setQuery('')
+              }
+            }}
+            onChange={(event) => {
+              if (!open) setOpen(true)
+              setQuery(event.target.value)
+            }}
+            onKeyDown={handleKeyDown}
+          />
+          <span className="select-input-chevron" aria-hidden="true" />
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="select-trigger"
+          ref={triggerRef}
+          aria-label={ariaLabel}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={open ? listId : undefined}
+          onClick={() => {
+            if (open) {
+              close()
+            } else {
+              setOpen(true)
+            }
+          }}
+          onKeyDown={handleKeyDown}
+        >
+          <span className="select-value">{selected?.label ?? '请选择'}</span>
+          {selected?.meta ? <span className="select-meta">{selected.meta}</span> : null}
+          <span className="select-chevron" aria-hidden="true" />
+        </button>
+      )}
 
       {open ? (
         <div className="select-popover">
-          {searchable ? (
-            <div className="select-search">
-              <input
-                ref={searchRef}
-                type="text"
-                value={query}
-                placeholder={searchPlaceholder}
-                aria-label={searchPlaceholder}
-                autoComplete="off"
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-            </div>
-          ) : null}
           <div
             className="select-options"
             id={listId}
