@@ -21,6 +21,7 @@ import {
   SubscriptionForm,
 } from './components/forms'
 import { JointRenewForm } from './components/JointRenewForm'
+import { ConfirmDialog } from './components/ui'
 
 type Tab = 'dashboard' | 'subscriptions' | 'payments' | 'compare'
 
@@ -79,6 +80,9 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [modal, setModal] = useState<ModalState>(null)
   const [toast, setToast] = useState<Toast | null>(null)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetAck, setResetAck] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const load = async () => {
     setLoadError(null)
@@ -222,9 +226,13 @@ export default function App() {
     }
   }
 
+  const openReset = () => {
+    setResetAck(false)
+    setResetOpen(true)
+  }
+
   const handleReset = async () => {
-    if (!window.confirm('清空所有会员、支付流水和比价记录？此操作不可恢复。')) return
-    if (!window.confirm('最后确认：真的要清空全部数据吗？')) return
+    setResetting(true)
     try {
       setState(
         await api<AppState>('/data', {
@@ -232,9 +240,12 @@ export default function App() {
           body: JSON.stringify({ confirm: 'DELETE' }),
         }),
       )
+      setResetOpen(false)
       notify('数据已清空')
     } catch (error) {
       notify((error as Error).message, 'err')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -410,7 +421,7 @@ export default function App() {
             <button className="link-action" onClick={handleExportData}>
               导出数据
             </button>
-            <button className="link-danger" onClick={() => void handleReset()}>
+            <button className="link-danger" onClick={openReset}>
               清空全部数据
             </button>
           </div>
@@ -466,6 +477,47 @@ export default function App() {
 
       {modal?.kind === 'jointQuote' ? (
         <JointQuoteForm state={state} onClose={closeModal} onSaved={handleSaved} />
+      ) : null}
+
+      {resetOpen ? (
+        <ConfirmDialog
+          title="清空全部数据"
+          subtitle="此操作不可恢复，请谨慎操作"
+          confirmLabel="确认清空"
+          confirmDisabled={!resetAck}
+          busy={resetting}
+          onConfirm={() => void handleReset()}
+          onClose={() => setResetOpen(false)}
+        >
+          <p className="confirm-text">将永久删除以下全部内容：</p>
+          <ul className="confirm-list">
+            <li>
+              <strong>{state.subscriptions.length}</strong> 个会员及其全部支付流水
+            </li>
+            {state.jointRenewals.length > 0 ? (
+              <li>
+                <strong>{state.jointRenewals.length}</strong> 条联合续费记录
+              </li>
+            ) : null}
+            {state.snapshots.length + state.jointQuotes.length > 0 ? (
+              <li>
+                <strong>{state.snapshots.length + state.jointQuotes.length}</strong> 条比价 /
+                联合报价
+              </li>
+            ) : null}
+          </ul>
+          <p className="confirm-hint">
+            清空后无法恢复。如需保留，请先关闭此窗口，点底部的「导出数据」备份。
+          </p>
+          <label className="confirm-check">
+            <input
+              type="checkbox"
+              checked={resetAck}
+              onChange={(event) => setResetAck(event.target.checked)}
+            />
+            <span>我已了解，确认清空全部数据</span>
+          </label>
+        </ConfirmDialog>
       ) : null}
 
       {toast ? <div className={`toast ${toast.kind}`}>{toast.message}</div> : null}

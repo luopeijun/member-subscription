@@ -102,9 +102,10 @@ type ModalProps = {
   subtitle?: string
   onClose: () => void
   children: ReactNode
+  className?: string
 }
 
-export function Modal({ title, subtitle, onClose, children }: ModalProps) {
+export function Modal({ title, subtitle, onClose, children, className }: ModalProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -124,7 +125,7 @@ export function Modal({ title, subtitle, onClose, children }: ModalProps) {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal ${className ?? ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-head">
           <div>
             <h2>{title}</h2>
@@ -138,6 +139,56 @@ export function Modal({ title, subtitle, onClose, children }: ModalProps) {
       </div>
     </div>,
     document.body,
+  )
+}
+
+type ConfirmDialogProps = {
+  title: string
+  subtitle?: string
+  children: ReactNode
+  confirmLabel?: string
+  cancelLabel?: string
+  tone?: 'danger' | 'primary'
+  confirmDisabled?: boolean
+  busy?: boolean
+  onConfirm: () => void
+  onClose: () => void
+}
+
+export function ConfirmDialog({
+  title,
+  subtitle,
+  children,
+  confirmLabel = '确认',
+  cancelLabel = '取消',
+  tone = 'danger',
+  confirmDisabled = false,
+  busy = false,
+  onConfirm,
+  onClose,
+}: ConfirmDialogProps) {
+  return (
+    <Modal title={title} subtitle={subtitle} onClose={onClose} className="confirm-modal">
+      <div className="confirm-lead">
+        <span className={`confirm-icon ${tone}`} aria-hidden="true">
+          !
+        </span>
+        <div className="confirm-copy">{children}</div>
+      </div>
+      <div className="modal-foot">
+        <button type="button" className="btn" onClick={onClose} disabled={busy}>
+          {cancelLabel}
+        </button>
+        <button
+          type="button"
+          className={`btn ${tone === 'danger' ? 'danger-solid' : 'primary'}`}
+          onClick={onConfirm}
+          disabled={confirmDisabled || busy}
+        >
+          {busy ? '处理中…' : confirmLabel}
+        </button>
+      </div>
+    </Modal>
   )
 }
 
