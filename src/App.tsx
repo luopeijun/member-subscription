@@ -99,7 +99,7 @@ export default function App() {
 
   useEffect(() => {
     if (!toast) return
-    const timer = window.setTimeout(() => setToast(null), 3500)
+    const timer = window.setTimeout(() => setToast(null), 2000)
     return () => window.clearTimeout(timer)
   }, [toast])
 
@@ -507,7 +507,7 @@ export default function App() {
             ) : null}
           </ul>
           <p className="confirm-hint">
-            清空后无法恢复。如需保留，请先关闭此窗口，点底部的「导出数据」备份。
+            清空前会自动在 data/backups 留一份快照；如需自行保管，建议先用底部的「导出数据」备份。
           </p>
           <label className="confirm-check">
             <input
