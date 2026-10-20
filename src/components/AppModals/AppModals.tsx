@@ -10,7 +10,6 @@ export type ModalState =
   | { kind: 'edit'; subscription: Subscription }
   | { kind: 'renew'; subscription: Subscription }
   | { kind: 'jointRenew' }
-  | { kind: 'payment' }
   | { kind: 'quote'; plan: Plan }
   | { kind: 'newQuote' }
   | { kind: 'jointQuote' }
@@ -59,15 +58,6 @@ export function AppModals({ state, modal, onClose, onSaved }: AppModalsProps) {
       return (
         <JointRenewForm
           key="jointRenew"
-          state={state}
-          onClose={onClose}
-          onSaved={onSaved}
-        />
-      )
-    case 'payment':
-      return (
-        <PaymentForm
-          key="payment"
           state={state}
           onClose={onClose}
           onSaved={onSaved}

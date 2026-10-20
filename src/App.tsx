@@ -249,7 +249,6 @@ export default function App() {
         {tab === 'payments' ? (
           <Payments
             state={state}
-            onAdd={() => setModal({ kind: 'payment' })}
             onDelete={handleDeletePayment}
             onDeleteJointRenewal={handleDeleteJointRenewal}
           />

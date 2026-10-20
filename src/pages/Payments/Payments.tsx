@@ -10,7 +10,6 @@ import './Payments.scss'
 
 type PaymentsProps = {
   state: AppState
-  onAdd: () => void
   onDelete: (payment: Payment) => void
   onDeleteJointRenewal: (jointRenewal: JointRenewal) => void
 }
@@ -22,7 +21,7 @@ function inDateRange(paidAt: string, fromDate: string, toDate: string): boolean 
   return true
 }
 
-export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: PaymentsProps) {
+export function Payments({ state, onDelete, onDeleteJointRenewal }: PaymentsProps) {
   const [query, setQuery] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -167,9 +166,6 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
             onChange={changeQuery}
             placeholder="搜索会员名称"
           />
-          <button className="btn primary" onClick={onAdd} disabled={state.subscriptions.length === 0}>
-            + 记一笔支付
-          </button>
         </div>
       </div>
 
@@ -177,16 +173,7 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
         <div className="card card-pad">
           <EmptyState
             title="还没有支付流水"
-            description="每次续费后记一笔，能从流水里看到涨价和实际月均成本。"
-            action={
-              <button
-                className="btn primary"
-                onClick={onAdd}
-                disabled={state.subscriptions.length === 0}
-              >
-                记一笔支付
-              </button>
-            }
+            description="在会员页续费后，支付流水会出现在这里，可以查看涨价和实际月均成本。"
           />
         </div>
       ) : (
