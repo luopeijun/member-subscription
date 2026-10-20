@@ -11,10 +11,14 @@ export function formatDuration(days: number): string {
 
 /** 常见时长的快捷选项，方便一次点选。 */
 export const DURATION_PRESETS: { days: number; label: string }[] = [
+  { days: 1, label: '1 天' },
   { days: 7, label: '7 天' },
   { days: 30, label: '1 个月' },
   { days: 90, label: '3 个月' },
   { days: 180, label: '6 个月' },
   { days: 365, label: '1 年' },
   { days: 395, label: '1 年 + 1 个月' },
+  { days: 455, label: '1 年 + 3 个月' },
+  { days: 545, label: '1 年 + 6 个月' },
+  { days: 730, label: '2 年' },
 ]
