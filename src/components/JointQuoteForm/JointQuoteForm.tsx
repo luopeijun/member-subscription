@@ -6,6 +6,7 @@ import { Modal } from '@/components/Modal/Modal'
 import { formatCNY, toMinor } from '@shared/money'
 import { DAYS_PER_MONTH, DURATION_PRESETS } from '@shared/duration'
 import { clampDurationDays } from '@/utils/duration'
+import { monthlyEquivalent } from '@/utils/subscription'
 import './JointQuoteForm.scss'
 
 /* ---------------------------------- 联合报价 --------------------------------- */
@@ -19,11 +20,6 @@ type JointQuoteFormProps = {
 type QuoteItemDraft = {
   id: number
   days: number
-}
-
-function monthlyEquivalent(sub: Subscription): number | null {
-  if (!sub.lastPayment || sub.annualized <= 0) return null
-  return Math.round(sub.annualized / 12)
 }
 
 export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps) {

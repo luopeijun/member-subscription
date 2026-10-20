@@ -8,6 +8,11 @@ export const CYCLE_OPTIONS = [
   { value: -1, label: '买断（永久）' },
 ]
 
+export function equivalentMonthly(cycleMonths: number, amount: number): number | null {
+  if (cycleMonths <= 0) return null
+  return Math.round(amount / cycleMonths)
+}
+
 export function cycleLabel(months: number): string {
   switch (months) {
     case -1:

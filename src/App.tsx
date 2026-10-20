@@ -9,88 +9,29 @@ import type {
   Snapshot,
   Subscription,
 } from '@/types'
+import { PAGE_META, type Tab } from '@/constants'
 import { Dashboard } from '@/pages/Dashboard/Dashboard'
 import { Subscriptions } from '@/pages/Subscriptions/Subscriptions'
 import { Payments } from '@/pages/Payments/Payments'
 import { Compare } from '@/pages/Compare/Compare'
-import { SubscriptionForm } from '@/components/SubscriptionForm/SubscriptionForm'
-import { PaymentForm } from '@/components/PaymentForm/PaymentForm'
-import { SnapshotForm } from '@/components/SnapshotForm/SnapshotForm'
-import { PlanForm } from '@/components/PlanForm/PlanForm'
-import { JointQuoteForm } from '@/components/JointQuoteForm/JointQuoteForm'
-import { JointRenewForm } from '@/components/JointRenewForm/JointRenewForm'
-import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog'
+import { AppFooter } from '@/components/AppFooter/AppFooter'
+import { AppModals, type ModalState } from '@/components/AppModals/AppModals'
+import { BootScreen } from '@/components/BootScreen/BootScreen'
+import { PageHeader } from '@/components/PageHeader/PageHeader'
+import { ResetDataDialog } from '@/components/ResetDataDialog/ResetDataDialog'
 import { Toast, type ToastKind } from '@/components/Toast/Toast'
+import { Topbar } from '@/components/Topbar/Topbar'
+import { formatImportSummary, type ImportSummary } from '@/utils/import'
+import { readStoredTab, storeTab } from '@/utils/tab'
 import './App.scss'
 
-type Tab = 'dashboard' | 'subscriptions' | 'payments' | 'compare'
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'dashboard', label: '总览' },
-  { id: 'subscriptions', label: '会员' },
-  { id: 'payments', label: '流水' },
-  { id: 'compare', label: '比价' },
-]
-
-const TAB_KEY = 'subledger.tab'
-
-function storedTab(): Tab {
-  try {
-    const saved = window.localStorage.getItem(TAB_KEY)
-    if (TABS.some((item) => item.id === saved)) return saved as Tab
-  } catch {
-    // localStorage 不可用时退回总览
-  }
-  return 'dashboard'
-}
-
-const PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
-  dashboard: {
-    title: '总览',
-    subtitle: '月均成本、到期提醒和现金流，一眼看完',
-  },
-  subscriptions: {
-    title: '会员',
-    subtitle: '每个会员的实际价格、周期和下次扣款',
-  },
-  payments: {
-    title: '支付流水',
-    subtitle: '每一次续费花了多少钱，都在这里',
-  },
-  compare: {
-    title: '比价',
-    subtitle: '我买的价格，和其他平台报的价格',
-  },
-}
-
-type ModalState =
-  | { kind: 'add' }
-  | { kind: 'edit'; subscription: Subscription }
-  | { kind: 'renew'; subscription: Subscription }
-  | { kind: 'jointRenew' }
-  | { kind: 'payment' }
-  | { kind: 'snapshot'; plan: Plan }
-  | { kind: 'plan' }
-  | { kind: 'jointQuote' }
-  | null
-
 type ToastState = { message: string; kind: ToastKind }
-
-type ImportSummary = {
-  servicesAdded: number
-  plansAdded: number
-  subscriptionsAdded: number
-  jointRenewalsAdded: number
-  jointQuotesAdded: number
-  paymentsAdded: number
-  snapshotsAdded: number
-}
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>(storedTab)
-  const [modal, setModal] = useState<ModalState>(null)
+  const [tab, setTab] = useState<Tab>(readStoredTab)
+  const [modal, setModal] = useState<ModalState | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
   const [resetAck, setResetAck] = useState(false)
@@ -117,11 +58,7 @@ export default function App() {
 
   // 记住当前页面：保存、刷新、甚至开发时热重载后都留在原地。
   useEffect(() => {
-    try {
-      window.localStorage.setItem(TAB_KEY, tab)
-    } catch {
-      // 忽略隐私模式下的写入失败
-    }
+    storeTab(tab)
   }, [tab])
 
   const notify = (message: string, kind: ToastKind = 'ok') => {
@@ -308,82 +245,24 @@ export default function App() {
         body: JSON.stringify(payload),
       })
       setState(next)
-      const counts = next.imported
-      const parts = [
-        `会员 ${counts.subscriptionsAdded} 条`,
-        `支付 ${counts.paymentsAdded} 笔`,
-        `报价 ${counts.snapshotsAdded} 条`,
-      ]
-      if (counts.jointRenewalsAdded > 0) {
-        parts.push(`联合续费 ${counts.jointRenewalsAdded} 条`)
-      }
-      if (counts.jointQuotesAdded > 0) {
-        parts.push(`联合报价 ${counts.jointQuotesAdded} 条`)
-      }
-      notify(`导入完成：${parts.join('、')}`)
+      notify(formatImportSummary(next.imported))
     } catch (error) {
       notify(`导入失败：${(error as Error).message}`, 'err')
     }
   }
 
-  if (loadError) {
-    return (
-      <div className="boot">
-        <div className="card card-pad boot-card">
-          <h1>加载失败</h1>
-          <p className="muted">{loadError}</p>
-          <button className="btn primary" onClick={() => void load()}>
-            重试
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!state) {
-    return (
-      <div className="boot">
-        <div className="spinner" />
-        <p className="muted">正在读取本地数据…</p>
-      </div>
-    )
+  if (loadError || !state) {
+    return <BootScreen error={loadError} onRetry={() => void load()} />
   }
 
   const meta = PAGE_META[tab]
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <button className="brand" onClick={() => setTab('dashboard')}>
-            <span className="brand-mark">¥</span>
-            <span className="brand-text">
-              <strong>会员订阅</strong>
-            </span>
-          </button>
-
-          <nav className="nav">
-            {TABS.map((item) => (
-              <button
-                key={item.id}
-                className={`nav-item ${tab === item.id ? 'active' : ''}`}
-                onClick={() => setTab(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </header>
+      <Topbar tab={tab} onTabChange={setTab} />
 
       <main className="container">
-        <div className="page-head">
-          <div>
-            <h1>{meta.title}</h1>
-            <p>{meta.subtitle}</p>
-          </div>
-          <span className="today-pill">今天 {state.today}</span>
-        </div>
+        <PageHeader title={meta.title} subtitle={meta.subtitle} today={state.today} />
 
         {tab === 'dashboard' ? (
           <Dashboard
@@ -428,118 +307,29 @@ export default function App() {
           />
         ) : null}
 
-        <footer className="app-foot">
-          <div className="foot-actions">
-            <label className="link-action">
-              导入数据
-              <input
-                type="file"
-                accept="application/json,.json"
-                hidden
-                onChange={(event) => void handleImportFile(event)}
-              />
-            </label>
-            <button className="link-action" onClick={handleExportData}>
-              导出数据
-            </button>
-            <button className="link-danger" onClick={openReset}>
-              清空全部数据
-            </button>
-          </div>
-        </footer>
+        <AppFooter
+          onImport={(event) => void handleImportFile(event)}
+          onExport={handleExportData}
+          onReset={openReset}
+        />
       </main>
 
-      {modal?.kind === 'add' ? (
-        <SubscriptionForm state={state} onClose={closeModal} onSaved={handleSaved} />
-      ) : null}
+      <AppModals
+        state={state}
+        modal={modal}
+        onClose={closeModal}
+        onSaved={handleSaved}
+      />
 
-      {modal?.kind === 'edit' ? (
-        <SubscriptionForm
-          state={state}
-          editing={modal.subscription}
-          onClose={closeModal}
-          onSaved={handleSaved}
-        />
-      ) : null}
-
-      {modal?.kind === 'renew' ? (
-        <PaymentForm
-          state={state}
-          subscription={modal.subscription}
-          onClose={closeModal}
-          onSaved={handleSaved}
-        />
-      ) : null}
-
-      {modal?.kind === 'jointRenew' ? (
-        <JointRenewForm
-          state={state}
-          onClose={closeModal}
-          onSaved={handleSaved}
-        />
-      ) : null}
-
-      {modal?.kind === 'payment' ? (
-        <PaymentForm state={state} onClose={closeModal} onSaved={handleSaved} />
-      ) : null}
-
-      {modal?.kind === 'snapshot' ? (
-        <SnapshotForm
-          plan={modal.plan}
-          today={state.today}
-          onClose={closeModal}
-          onSaved={handleSaved}
-        />
-      ) : null}
-
-      {modal?.kind === 'plan' ? (
-        <PlanForm state={state} onClose={closeModal} onSaved={handleSaved} />
-      ) : null}
-
-      {modal?.kind === 'jointQuote' ? (
-        <JointQuoteForm state={state} onClose={closeModal} onSaved={handleSaved} />
-      ) : null}
-
-      {resetOpen ? (
-        <ConfirmDialog
-          title="清空全部数据"
-          subtitle="此操作不可恢复，请谨慎操作"
-          confirmLabel="确认清空"
-          confirmDisabled={!resetAck}
-          busy={resetting}
-          onConfirm={() => void handleReset()}
-          onClose={() => setResetOpen(false)}
-        >
-          <p className="confirm-text">将永久删除以下全部内容：</p>
-          <ul className="confirm-list">
-            <li>
-              <strong>{state.subscriptions.length}</strong> 个会员及其全部支付流水
-            </li>
-            {state.jointRenewals.length > 0 ? (
-              <li>
-                <strong>{state.jointRenewals.length}</strong> 条联合续费记录
-              </li>
-            ) : null}
-            {state.snapshots.length + state.jointQuotes.length > 0 ? (
-              <li>
-                <strong>{state.snapshots.length + state.jointQuotes.length}</strong> 条比价 /
-                联合报价
-              </li>
-            ) : null}
-          </ul>
-          <p className="confirm-hint">
-            清空前会自动在 data/backups 留一份快照；如需自行保管，建议先用底部的「导出数据」备份。
-          </p>
-          <label className="confirm-check">
-            <input
-              type="checkbox"
-              checked={resetAck}
-              onChange={(event) => setResetAck(event.target.checked)}
-            />
-            <span>我已了解，确认清空全部数据</span>
-          </label>
-        </ConfirmDialog>
-      ) : null}
+      <ResetDataDialog
+        state={state}
+        open={resetOpen}
+        acknowledged={resetAck}
+        busy={resetting}
+        onAcknowledgedChange={setResetAck}
+        onConfirm={() => void handleReset()}
+        onClose={() => setResetOpen(false)}
+      />
 
       {toast ? <Toast message={toast.message} kind={toast.kind} /> : null}
     </div>

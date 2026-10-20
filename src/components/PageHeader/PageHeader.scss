@@ -1,0 +1,43 @@
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page-head h1 {
+  font-size: 25px;
+  letter-spacing: -0.4px;
+}
+
+.page-head p {
+  color: var(--muted);
+  margin-top: 3px;
+  font-size: 13px;
+}
+
+.today-pill {
+  font-size: 12px;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 780px) {
+  .page-head {
+    align-items: flex-start;
+  }
+
+  .page-head h1 {
+    font-size: 21px;
+  }
+
+  .today-pill {
+    display: none;
+  }
+}

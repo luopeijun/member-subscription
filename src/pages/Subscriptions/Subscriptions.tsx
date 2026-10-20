@@ -3,8 +3,10 @@ import type { AppState, Subscription } from '@/types'
 import { formatCNY } from '@shared/money'
 import { DaysBadge, StatusBadge } from '@/components/Badge/Badge'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { SearchBox } from '@/components/SearchBox/SearchBox'
 import { cycleLabel } from '@/utils/cycle'
 import { formatDate } from '@/utils/format'
+import { sortSubscriptions, subscriptionMatchesQuery } from '@/utils/subscription'
 import './Subscriptions.scss'
 
 type SubscriptionsProps = {
@@ -22,8 +24,6 @@ const FILTERS = [
   { value: 'planned', label: '想买' },
   { value: 'expired', label: '已过期' },
 ] as const
-
-const STATUS_ORDER: Record<string, number> = { active: 0, planned: 1, expired: 2 }
 
 type Filter = (typeof FILTERS)[number]['value']
 
@@ -43,27 +43,10 @@ export function Subscriptions({
   const list = useMemo(() => {
     const filtered = state.subscriptions.filter((sub) => {
       if (filter !== 'all' && sub.status !== filter) return false
-      if (!keyword) return true
-      return [
-        sub.serviceName,
-        sub.planName,
-        sub.platform,
-        sub.account,
-        sub.note,
-      ].some((value) => Boolean(value && value.toLowerCase().includes(keyword)))
+      return subscriptionMatchesQuery(sub, keyword)
     })
 
-    return [...filtered].sort((a, b) => {
-      if (a.status !== b.status) {
-        return (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)
-      }
-      if (a.nextRenewalAt && b.nextRenewalAt) {
-        return a.nextRenewalAt.localeCompare(b.nextRenewalAt)
-      }
-      if (a.nextRenewalAt) return -1
-      if (b.nextRenewalAt) return 1
-      return a.serviceName.localeCompare(b.serviceName)
-    })
+    return [...filtered].sort(sortSubscriptions)
   }, [state.subscriptions, filter, keyword])
 
   return (
@@ -88,24 +71,11 @@ export function Subscriptions({
           })}
         </div>
         <div className="toolbar-right">
-          <div className="search-box">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索会员名称或备注"
-              aria-label="搜索会员名称或备注"
-            />
-            {query ? (
-              <button
-                type="button"
-                className="search-clear"
-                onClick={() => setQuery('')}
-                aria-label="清除搜索"
-              >
-                ×
-              </button>
-            ) : null}
-          </div>
+          <SearchBox
+            value={query}
+            onChange={setQuery}
+            placeholder="搜索会员名称或备注"
+          />
           <button className="btn" onClick={onJointRenew}>
             联合续费
           </button>

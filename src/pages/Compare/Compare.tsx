@@ -9,8 +9,11 @@ import type {
 import { formatCNY } from '@shared/money'
 import { DAYS_PER_MONTH, formatDuration } from '@shared/duration'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
-import { cycleLabel } from '@/utils/cycle'
+import { SearchBox } from '@/components/SearchBox/SearchBox'
+import { cycleLabel, equivalentMonthly } from '@/utils/cycle'
 import { formatDay } from '@/utils/format'
+import { groupPlansByService } from '@/utils/plan'
+import { latestPerPlatform, searchSnapshots } from '@/utils/snapshot'
 import './Compare.scss'
 
 type CompareProps = {
@@ -21,21 +24,6 @@ type CompareProps = {
   onDeleteSnapshot: (snapshot: Snapshot) => void
   onAddJointQuote: () => void
   onDeleteJointQuote: (jointQuote: JointQuote) => void
-}
-
-function equivalentMonthly(cycleMonths: number, amount: number): number | null {
-  if (cycleMonths <= 0) return null
-  return Math.round(amount / cycleMonths)
-}
-
-function latestPerPlatform(snapshots: Snapshot[], planId: number): Snapshot[] {
-  const map = new Map<string, Snapshot>()
-  for (const snapshot of snapshots) {
-    if (snapshot.planId !== planId) continue
-    const key = (snapshot.platform ?? '未标注').trim().toLowerCase()
-    if (!map.has(key)) map.set(key, snapshot)
-  }
-  return [...map.values()].sort((a, b) => a.price - b.price)
 }
 
 function JointQuoteCard({
@@ -273,31 +261,13 @@ export function Compare({
   const [query, setQuery] = useState('')
   const keyword = query.trim().toLowerCase()
 
-  const groups = useMemo(() => {
-    const map = new Map<string, { category: string; plans: Plan[] }>()
-    for (const plan of state.plans) {
-      if (
-        keyword &&
-        !plan.serviceName.toLowerCase().includes(keyword) &&
-        !plan.name.toLowerCase().includes(keyword)
-      ) {
-        continue
-      }
-      const group = map.get(plan.serviceName) ?? { category: plan.category, plans: [] }
-      group.plans.push(plan)
-      map.set(plan.serviceName, group)
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-  }, [state.plans, keyword])
+  const groups = useMemo(
+    () => groupPlansByService(state.plans, keyword),
+    [state.plans, keyword],
+  )
 
   const history = useMemo(
-    () =>
-      state.snapshots.filter(
-        (snapshot) =>
-          !keyword ||
-          snapshot.serviceName.toLowerCase().includes(keyword) ||
-          snapshot.planName.toLowerCase().includes(keyword),
-      ),
+    () => searchSnapshots(state.snapshots, keyword),
     [state.snapshots, keyword],
   )
 
@@ -317,24 +287,11 @@ export function Compare({
           </span>
         </div>
         <div className="toolbar-right">
-          <div className="search-box">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索会员名称"
-              aria-label="搜索会员名称"
-            />
-            {query ? (
-              <button
-                type="button"
-                className="search-clear"
-                onClick={() => setQuery('')}
-                aria-label="清除搜索"
-              >
-                ×
-              </button>
-            ) : null}
-          </div>
+          <SearchBox
+            value={query}
+            onChange={setQuery}
+            placeholder="搜索会员名称"
+          />
           <button className="btn" onClick={onAddJointQuote}>
             记录联合报价
           </button>
@@ -397,11 +354,11 @@ export function Compare({
           )}
         </div>
       ) : (
-        groups.map(([serviceName, group]) => (
-          <section className="card compare-card" key={serviceName}>
+        groups.map((group) => (
+          <section className="card compare-card" key={group.serviceName}>
             <div className="group-head">
               <div>
-                <h2>{serviceName}</h2>
+                <h2>{group.serviceName}</h2>
                 <p>
                   {group.category} · {group.plans.length} 个套餐
                 </p>

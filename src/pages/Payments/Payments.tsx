@@ -4,6 +4,7 @@ import { formatCNY } from '@shared/money'
 import { formatDuration } from '@shared/duration'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import { Pagination } from '@/components/Pagination/Pagination'
+import { SearchBox } from '@/components/SearchBox/SearchBox'
 import { formatDate } from '@/utils/format'
 import './Payments.scss'
 
@@ -86,24 +87,11 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
           </span>
         </div>
         <div className="toolbar-right">
-          <div className="search-box">
-            <input
-              value={query}
-              onChange={(event) => changeQuery(event.target.value)}
-              placeholder="搜索会员名称"
-              aria-label="搜索会员名称"
-            />
-            {query ? (
-              <button
-                type="button"
-                className="search-clear"
-                onClick={() => setQuery('')}
-                aria-label="清除搜索"
-              >
-                ×
-              </button>
-            ) : null}
-          </div>
+          <SearchBox
+            value={query}
+            onChange={changeQuery}
+            placeholder="搜索会员名称"
+          />
           <button className="btn primary" onClick={onAdd} disabled={state.subscriptions.length === 0}>
             + 记一笔支付
           </button>
