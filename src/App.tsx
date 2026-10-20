@@ -32,6 +32,18 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'compare', label: '比价' },
 ]
 
+const TAB_KEY = 'subledger.tab'
+
+function storedTab(): Tab {
+  try {
+    const saved = window.localStorage.getItem(TAB_KEY)
+    if (TABS.some((item) => item.id === saved)) return saved as Tab
+  } catch {
+    // localStorage 不可用时退回总览
+  }
+  return 'dashboard'
+}
+
 const PAGE_META: Record<Tab, { title: string; subtitle: string }> = {
   dashboard: {
     title: '总览',
@@ -77,7 +89,7 @@ type ImportSummary = {
 export default function App() {
   const [state, setState] = useState<AppState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('dashboard')
+  const [tab, setTab] = useState<Tab>(storedTab)
   const [modal, setModal] = useState<ModalState>(null)
   const [toast, setToast] = useState<Toast | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
@@ -102,6 +114,15 @@ export default function App() {
     const timer = window.setTimeout(() => setToast(null), 2000)
     return () => window.clearTimeout(timer)
   }, [toast])
+
+  // 记住当前页面：保存、刷新、甚至开发时热重载后都留在原地。
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(TAB_KEY, tab)
+    } catch {
+      // 忽略隐私模式下的写入失败
+    }
+  }, [tab])
 
   const notify = (message: string, kind: Toast['kind'] = 'ok') => {
     setToast({ message, kind })
