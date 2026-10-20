@@ -8,6 +8,15 @@ export type ImportSummary = {
   snapshotsAdded: number
 }
 
+export async function readJsonFile(file: File): Promise<unknown> {
+  const text = await file.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error('文件内容不是有效的 JSON')
+  }
+}
+
 export function formatImportSummary(counts: ImportSummary): string {
   const parts = [
     `会员 ${counts.subscriptionsAdded} 条`,

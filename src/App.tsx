@@ -21,7 +21,8 @@ import { PageHeader } from '@/components/PageHeader/PageHeader'
 import { ResetDataDialog } from '@/components/ResetDataDialog/ResetDataDialog'
 import { Toast, type ToastKind } from '@/components/Toast/Toast'
 import { Topbar } from '@/components/Topbar/Topbar'
-import { formatImportSummary, type ImportSummary } from '@/utils/import'
+import { downloadJson } from '@/utils/download'
+import { formatImportSummary, readJsonFile, type ImportSummary } from '@/utils/import'
 import { readStoredTab, storeTab } from '@/utils/tab'
 import './App.scss'
 
@@ -73,7 +74,16 @@ export default function App() {
     notify(message)
   }
 
-  const handleDeleteSubscription = async (subscription: Subscription) => {
+  const remove = async (path: string, message: string) => {
+    try {
+      setState(await api<AppState>(path, { method: 'DELETE' }))
+      notify(message)
+    } catch (error) {
+      notify((error as Error).message, 'err')
+    }
+  }
+
+  const handleDeleteSubscription = (subscription: Subscription) => {
     if (
       !window.confirm(
         `删除「${subscription.serviceName} · ${subscription.planName}」？\n相关支付流水会一并删除，且无法恢复。`,
@@ -81,15 +91,10 @@ export default function App() {
     ) {
       return
     }
-    try {
-      setState(await api<AppState>(`/subscriptions/${subscription.id}`, { method: 'DELETE' }))
-      notify('已删除会员')
-    } catch (error) {
-      notify((error as Error).message, 'err')
-    }
+    void remove(`/subscriptions/${subscription.id}`, '已删除会员')
   }
 
-  const handleDeletePayment = async (payment: Payment) => {
+  const handleDeletePayment = (payment: Payment) => {
     if (
       !window.confirm(
         `删除 ${payment.paidAt} 的支付记录？\n${payment.serviceName} · ${payment.planName}`,
@@ -97,15 +102,10 @@ export default function App() {
     ) {
       return
     }
-    try {
-      setState(await api<AppState>(`/payments/${payment.id}`, { method: 'DELETE' }))
-      notify('已删除支付记录')
-    } catch (error) {
-      notify((error as Error).message, 'err')
-    }
+    void remove(`/payments/${payment.id}`, '已删除支付记录')
   }
 
-  const handleDeleteJointRenewal = async (jointRenewal: JointRenewal) => {
+  const handleDeleteJointRenewal = (jointRenewal: JointRenewal) => {
     if (
       !window.confirm(
         `删除 ${jointRenewal.paidAt} 的联合续费记录？\n会同时删除关联的 ${jointRenewal.members.length} 笔支付，但不会回退会员到期日。`,
@@ -113,31 +113,17 @@ export default function App() {
     ) {
       return
     }
-    try {
-      setState(
-        await api<AppState>(`/joint-renewals/${jointRenewal.id}`, {
-          method: 'DELETE',
-        }),
-      )
-      notify('已删除联合续费记录')
-    } catch (error) {
-      notify((error as Error).message, 'err')
-    }
+    void remove(`/joint-renewals/${jointRenewal.id}`, '已删除联合续费记录')
   }
 
-  const handleDeletePlan = async (plan: Plan) => {
+  const handleDeletePlan = (plan: Plan) => {
     if (!window.confirm(`删除候选套餐「${plan.serviceName} · ${plan.name}」及其比价记录？`)) {
       return
     }
-    try {
-      setState(await api<AppState>(`/plans/${plan.id}`, { method: 'DELETE' }))
-      notify('已删除套餐')
-    } catch (error) {
-      notify((error as Error).message, 'err')
-    }
+    void remove(`/plans/${plan.id}`, '已删除套餐')
   }
 
-  const handleDeleteSnapshot = async (snapshot: Snapshot) => {
+  const handleDeleteSnapshot = (snapshot: Snapshot) => {
     if (
       !window.confirm(
         `删除「${snapshot.platform ?? '未标注'}」在 ${snapshot.capturedAt} 记录的报价？`,
@@ -145,15 +131,10 @@ export default function App() {
     ) {
       return
     }
-    try {
-      setState(await api<AppState>(`/snapshots/${snapshot.id}`, { method: 'DELETE' }))
-      notify('已删除报价')
-    } catch (error) {
-      notify((error as Error).message, 'err')
-    }
+    void remove(`/snapshots/${snapshot.id}`, '已删除报价')
   }
 
-  const handleDeleteJointQuote = async (jointQuote: JointQuote) => {
+  const handleDeleteJointQuote = (jointQuote: JointQuote) => {
     if (
       !window.confirm(
         `删除「${jointQuote.platform ?? '未标注'}」在 ${jointQuote.capturedAt} 记录的联合报价？`,
@@ -161,14 +142,7 @@ export default function App() {
     ) {
       return
     }
-    try {
-      setState(
-        await api<AppState>(`/joint-quotes/${jointQuote.id}`, { method: 'DELETE' }),
-      )
-      notify('已删除联合报价')
-    } catch (error) {
-      notify((error as Error).message, 'err')
-    }
+    void remove(`/joint-quotes/${jointQuote.id}`, '已删除联合报价')
   }
 
   const handleSeed = async () => {
@@ -209,12 +183,7 @@ export default function App() {
 
   const handleExportData = () => {
     const filename = `subledger-${state?.today ?? 'backup'}.json`
-    const link = document.createElement('a')
-    link.href = '/api/export/json'
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
+    downloadJson(filename)
     notify(`已导出 ${filename}`)
   }
 
@@ -232,14 +201,7 @@ export default function App() {
     }
 
     try {
-      const text = await file.text()
-      let payload: unknown
-      try {
-        payload = JSON.parse(text)
-      } catch {
-        throw new Error('文件内容不是有效的 JSON')
-      }
-
+      const payload = await readJsonFile(file)
       const next = await api<AppState & { imported: ImportSummary }>('/import/json', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -280,7 +242,7 @@ export default function App() {
             onJointRenew={() => setModal({ kind: 'jointRenew' })}
             onEdit={(subscription) => setModal({ kind: 'edit', subscription })}
             onRenew={(subscription) => setModal({ kind: 'renew', subscription })}
-            onDelete={(subscription) => void handleDeleteSubscription(subscription)}
+            onDelete={handleDeleteSubscription}
           />
         ) : null}
 
@@ -288,10 +250,8 @@ export default function App() {
           <Payments
             state={state}
             onAdd={() => setModal({ kind: 'payment' })}
-            onDelete={(payment) => void handleDeletePayment(payment)}
-            onDeleteJointRenewal={(jointRenewal) =>
-              void handleDeleteJointRenewal(jointRenewal)
-            }
+            onDelete={handleDeletePayment}
+            onDeleteJointRenewal={handleDeleteJointRenewal}
           />
         ) : null}
 
@@ -300,10 +260,10 @@ export default function App() {
             state={state}
             onAddPlan={() => setModal({ kind: 'plan' })}
             onSnapshot={(plan) => setModal({ kind: 'snapshot', plan })}
-            onDeletePlan={(plan) => void handleDeletePlan(plan)}
-            onDeleteSnapshot={(snapshot) => void handleDeleteSnapshot(snapshot)}
+            onDeletePlan={handleDeletePlan}
+            onDeleteSnapshot={handleDeleteSnapshot}
             onAddJointQuote={() => setModal({ kind: 'jointQuote' })}
-            onDeleteJointQuote={(jointQuote) => void handleDeleteJointQuote(jointQuote)}
+            onDeleteJointQuote={handleDeleteJointQuote}
           />
         ) : null}
 
