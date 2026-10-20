@@ -15,15 +15,30 @@ type PaymentsProps = {
   onDeleteJointRenewal: (jointRenewal: JointRenewal) => void
 }
 
+function inDateRange(paidAt: string, fromDate: string, toDate: string): boolean {
+  if (fromDate && toDate && fromDate > toDate) return false
+  if (fromDate && paidAt < fromDate) return false
+  if (toDate && paidAt > toDate) return false
+  return true
+}
+
 export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: PaymentsProps) {
   const [query, setQuery] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const keyword = query.trim().toLowerCase()
+  const dateRangeInvalid = Boolean(fromDate && toDate && fromDate > toDate)
+
+  const dateScopedPayments = useMemo(
+    () => state.payments.filter((payment) => inDateRange(payment.paidAt, fromDate, toDate)),
+    [state.payments, fromDate, toDate],
+  )
 
   const individualPayments = useMemo(
-    () => state.payments.filter((payment) => payment.jointRenewalId === null),
-    [state.payments],
+    () => dateScopedPayments.filter((payment) => payment.jointRenewalId === null),
+    [dateScopedPayments],
   )
 
   const list = useMemo(
@@ -37,9 +52,14 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
     [individualPayments, keyword],
   )
 
+  const dateScopedJointRenewals = useMemo(
+    () => state.jointRenewals.filter((renewal) => inDateRange(renewal.paidAt, fromDate, toDate)),
+    [state.jointRenewals, fromDate, toDate],
+  )
+
   const jointRenewals = useMemo(
     () =>
-      state.jointRenewals.filter((renewal) => {
+      dateScopedJointRenewals.filter((renewal) => {
         if (!keyword) return true
         const haystack = [
           renewal.mainServiceName,
@@ -49,12 +69,12 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
         ]
         return haystack.some((value) => Boolean(value && value.toLowerCase().includes(keyword)))
       }),
-    [state.jointRenewals, keyword],
+    [dateScopedJointRenewals, keyword],
   )
 
-  const total = state.payments.reduce((sum, payment) => sum + payment.amount, 0)
+  const total = dateScopedPayments.reduce((sum, payment) => sum + payment.amount, 0)
   const average =
-    state.payments.length > 0 ? Math.round(total / state.payments.length) : 0
+    dateScopedPayments.length > 0 ? Math.round(total / dateScopedPayments.length) : 0
   const totalPages = Math.max(1, Math.ceil(list.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageItems = list.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -64,6 +84,30 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
     setPage(1)
   }
 
+  const changeFromDate = (value: string) => {
+    setFromDate(value)
+    setPage(1)
+  }
+
+  const changeToDate = (value: string) => {
+    setToDate(value)
+    setPage(1)
+  }
+
+  const clearDateRange = () => {
+    setFromDate('')
+    setToDate('')
+    setPage(1)
+  }
+
+  const clearFilters = () => {
+    setQuery('')
+    setFromDate('')
+    setToDate('')
+    setPage(1)
+  }
+
+  const hasFilters = Boolean(keyword || fromDate || toDate)
   const hasAnything = state.payments.length > 0 || state.jointRenewals.length > 0
   const hasMatches = jointRenewals.length > 0 || list.length > 0
 
@@ -72,11 +116,11 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
       <div className="toolbar">
         <div className="inline-stats">
           <span>
-            共 <strong>{state.payments.length}</strong> 笔
+            共 <strong>{dateScopedPayments.length}</strong> 笔
           </span>
-          {state.jointRenewals.length > 0 ? (
+          {dateScopedJointRenewals.length > 0 ? (
             <span>
-              联合续费 <strong>{state.jointRenewals.length}</strong> 条
+              联合续费 <strong>{dateScopedJointRenewals.length}</strong> 条
             </span>
           ) : null}
           <span>
@@ -87,6 +131,37 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
           </span>
         </div>
         <div className="toolbar-right">
+          <div
+            className={`date-range${dateRangeInvalid ? ' invalid' : ''}`}
+            title={dateRangeInvalid ? '开始日期不能晚于结束日期' : undefined}
+          >
+            <span className="date-range-label">支付日期</span>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(event) => changeFromDate(event.target.value)}
+              aria-label="开始日期"
+            />
+            <span className="date-range-sep">至</span>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(event) => changeToDate(event.target.value)}
+              aria-label="结束日期"
+            />
+            {fromDate || toDate ? (
+              <button
+                type="button"
+                className="date-range-clear"
+                onClick={clearDateRange}
+                aria-label="清除日期筛选"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
           <SearchBox
             value={query}
             onChange={changeQuery}
@@ -120,11 +195,21 @@ export function Payments({ state, onAdd, onDelete, onDeleteJointRenewal }: Payme
             <div className="card card-pad">
               <EmptyState
                 title="没有找到匹配的流水"
-                description={`会员名称里没有包含「${query.trim()}」的支付记录。`}
+                description={
+                  dateRangeInvalid
+                    ? '开始日期不能晚于结束日期。'
+                    : keyword && (fromDate || toDate)
+                      ? '当前搜索和日期范围内没有支付记录。'
+                      : keyword
+                        ? `会员名称里没有包含「${query.trim()}」的支付记录。`
+                        : '所选日期范围内没有支付记录。'
+                }
                 action={
-                  <button className="btn" onClick={() => setQuery('')}>
-                    清除搜索
-                  </button>
+                  hasFilters ? (
+                    <button className="btn" onClick={clearFilters}>
+                      清除筛选
+                    </button>
+                  ) : undefined
                 }
               />
             </div>

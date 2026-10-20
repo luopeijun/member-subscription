@@ -4,33 +4,24 @@
   gap: 14px;
   align-items: center;
   padding: 12px 16px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    border-color 0.18s ease;
+  background: transparent;
+  border-bottom: 1px solid #f0f2f6;
+  transition: background 0.15s;
+}
+
+.pay-row:last-child {
+  border-bottom: 0;
 }
 
 @media (hover: hover) {
   .pay-row:hover {
-    transform: translateY(-2px);
-    border-color: #d8deea;
-    box-shadow:
-      0 14px 30px rgba(17, 24, 39, 0.09),
-      0 3px 8px rgba(17, 24, 39, 0.04);
+    background: #fafbfc;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pay-row {
     transition: none;
-  }
-
-  .pay-row:hover {
-    transform: none;
   }
 }
 
