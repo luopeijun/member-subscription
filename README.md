@@ -188,7 +188,7 @@ PORT=8080 HOST=0.0.0.0 npm start
 
 ## 测试
 
-`npm test` 会运行 `tests/` 下的 Vitest 单元测试，当前覆盖金额换算、日期与周期、续费预测、报价校验与分摊、排序、导入和标签页记忆等纯函数。
+`npm test` 会运行 `tests/` 下的 Vitest 单元测试，当前覆盖金额换算、日期与周期、续费预测、报价校验与分摊、排序、导入、标签页记忆，以及服务端参数校验和联合报价费用分摊。
 
 ## 数据与备份
 
@@ -202,9 +202,11 @@ PORT=8080 HOST=0.0.0.0 npm start
 
 ```text
 server/
-  api.ts        API 路由与参数校验
+  api.ts        API 路由
+  allocation.ts 联合报价费用分摊
+  validation.ts API 参数校验
   db.ts         SQLite 表结构、迁移和兼容旧数据
-  store.ts      聚合前端所需的完整状态、费用分摊和统计
+  store.ts      聚合前端所需的完整状态和统计
   transfer.ts   JSON 导入导出
   seed.ts       示例数据
   index.ts      Express 服务与 Vite 中间件
