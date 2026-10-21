@@ -1,7 +1,9 @@
+import { useMemo, useState } from 'react'
 import type { AppState, Subscription } from '@/types'
 import { formatCNY } from '@shared/money'
 import { DaysBadge } from '@/components/Badge/Badge'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { buildRenewalForecast } from '@/utils/forecast'
 import { monthLabel } from '@/utils/format'
 import './Dashboard.scss'
 
@@ -12,8 +14,28 @@ type DashboardProps = {
   onRenew: (subscription: Subscription) => void
 }
 
+type SpendView = 'actual' | 'future'
+
+const CATEGORY_COLORS = [
+  '#4f46e5',
+  '#0ea5e9',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#f97316',
+  '#14b8a6',
+  '#ec4899',
+  '#84cc16',
+]
+
 export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
   const { stats, subscriptions } = state
+  const [spendView, setSpendView] = useState<SpendView>('actual')
+  const futureSpend = useMemo(
+    () => buildRenewalForecast(subscriptions, state.today, 12),
+    [subscriptions, state.today],
+  )
 
   if (subscriptions.length === 0) {
     return (
@@ -36,14 +58,40 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
     )
   }
 
-  const maxMonthly = Math.max(...stats.monthlySpend.map((item) => item.total), 1)
-  const monthlyTotal = stats.monthlySpend.reduce((sum, item) => sum + item.total, 0)
-  const categoryTotal = Math.max(
-    stats.categories.reduce((sum, item) => sum + item.annualized, 0),
-    1,
-  )
-
   const subscriptionById = new Map(subscriptions.map((sub) => [sub.id, sub]))
+  const categorySum = stats.categories.reduce((sum, item) => sum + item.annualized, 0)
+  const categoryTotal = Math.max(categorySum, 1)
+  let categoryCursor = 0
+  const categoryStops = stats.categories.map((item, index) => {
+    const start = categoryCursor
+    categoryCursor += (item.annualized / categoryTotal) * 100
+    return `${CATEGORY_COLORS[index % CATEGORY_COLORS.length]} ${start}% ${categoryCursor}%`
+  })
+  const donutBackground =
+    categorySum > 0 ? `conic-gradient(${categoryStops.join(', ')})` : '#f1f3f7'
+
+  const activeSubscriptions = subscriptions.filter((sub) => sub.status === 'active')
+  const activeMonthlyTotal = activeSubscriptions.reduce(
+    (sum, sub) => sum + Math.round(sub.annualized / 12),
+    0,
+  )
+  const topMembers = activeSubscriptions
+    .map((sub) => ({ sub, monthly: Math.round(sub.annualized / 12) }))
+    .filter((item) => item.monthly > 0)
+    .sort((a, b) => b.monthly - a.monthly)
+    .slice(0, 6)
+  const topMaxMonthly = Math.max(...topMembers.map((item) => item.monthly), 1)
+
+  const spendData = spendView === 'actual' ? stats.monthlySpend : futureSpend
+  const spendMax = Math.max(...spendData.map((item) => item.total), 1)
+  const spendTotal = spendData.reduce((sum, item) => sum + item.total, 0)
+  const spendIsEmpty = spendTotal === 0
+  const spendTitle =
+    spendView === 'actual' ? '近 12 个月实际支出' : '未来 12 个月预计续费'
+  const spendDescription =
+    spendView === 'actual'
+      ? '按支付日统计，含所有状态'
+      : '按下次续费日和计费周期估算，仅活跃会员'
 
   return (
     <div className="stack">
@@ -127,24 +175,34 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
           {stats.categories.length === 0 ? (
             <p className="muted pad-y">暂无活跃会员。</p>
           ) : (
-            <div className="cat-list">
-              {stats.categories.map((item) => (
-                <div className="cat-row" key={item.category}>
-                  <div className="cat-head">
-                    <span>
-                      {item.category}
-                      <small>{item.count} 个</small>
-                    </span>
-                    <strong>{formatCNY(Math.round(item.annualized / 12))}</strong>
-                  </div>
-                  <div className="bar-track">
-                    <div
-                      className="bar-fill"
-                      style={{ width: `${Math.max(2, (item.annualized / categoryTotal) * 100)}%` }}
-                    />
-                  </div>
+            <div className="cat-chart">
+              <div className="donut" style={{ background: donutBackground }}>
+                <div className="donut-center">
+                  <span>月均合计</span>
+                  <strong>{formatCNY(Math.round(categorySum / 12))}</strong>
                 </div>
-              ))}
+              </div>
+              <div className="cat-legend">
+                {stats.categories.map((item, index) => {
+                  const percent = Math.round((item.annualized / categoryTotal) * 100)
+                  return (
+                    <div className="cat-legend-row" key={item.category}>
+                      <span
+                        className="legend-dot"
+                        style={{ background: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }}
+                      />
+                      <span className="legend-name">
+                        {item.category}
+                        <small>{item.count} 个</small>
+                      </span>
+                      <strong className="legend-value">
+                        {formatCNY(Math.round(item.annualized / 12))}
+                      </strong>
+                      <span className="legend-pct">{percent}%</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -153,30 +211,107 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
       <section className="card card-pad">
         <div className="card-head">
           <div>
-            <h2>近 12 个月实际支出</h2>
-            <p>按支付日统计，含所有状态</p>
+            <h2>会员月均 Top 6</h2>
+            <p>只统计活跃会员，按月均成本排序</p>
           </div>
-          <span className="count-pill">{formatCNY(monthlyTotal)}</span>
+          <span className="count-pill">{formatCNY(activeMonthlyTotal)}/月</span>
         </div>
-        <div className="bars">
-          {stats.monthlySpend.map((item, index) => (
-            <div className="bar-col" key={item.month} tabIndex={0}>
-              <div
-                className="bar"
-                style={{ height: `${Math.max(4, (item.total / maxMonthly) * 110)}px` }}
+        {topMembers.length === 0 ? (
+          <p className="muted pad-y">暂无有支付记录的活跃会员。</p>
+        ) : (
+          <div className="top-list">
+            {topMembers.map((item, index) => {
+              const share =
+                activeMonthlyTotal > 0
+                  ? Math.round((item.monthly / activeMonthlyTotal) * 100)
+                  : 0
+              return (
+                <div className="top-row" key={item.sub.id}>
+                  <div className="top-head">
+                    <span className="top-name">
+                      <em>{index + 1}</em>
+                      <span className="top-service">{item.sub.serviceName}</span>
+                      <small>{item.sub.planName}</small>
+                    </span>
+                    <span className="top-value">
+                      <strong>{formatCNY(item.monthly)}</strong>
+                      <small>/月 · {share}%</small>
+                    </span>
+                  </div>
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill"
+                      style={{
+                        width: `${Math.max(2, (item.monthly / topMaxMonthly) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="card card-pad">
+        <div className="card-head spend-head">
+          <div>
+            <h2>{spendTitle}</h2>
+            <p>{spendDescription}</p>
+          </div>
+          <div className="spend-head-right">
+            <div className="spend-switch" role="tablist" aria-label="支出视图">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={spendView === 'actual'}
+                className={`spend-tab${spendView === 'actual' ? ' active' : ''}`}
+                onClick={() => setSpendView('actual')}
               >
-                <span className="bar-tip">
-                  {item.month} · {formatCNY(item.total)}
+                实际支出
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={spendView === 'future'}
+                className={`spend-tab${spendView === 'future' ? ' active' : ''}`}
+                onClick={() => setSpendView('future')}
+              >
+                预计续费
+              </button>
+            </div>
+            <span className="count-pill">{formatCNY(spendTotal)}</span>
+          </div>
+        </div>
+
+        {spendIsEmpty ? (
+          <p className="muted pad-y">
+            {spendView === 'actual'
+              ? '近 12 个月还没有支付记录。'
+              : '当前没有可估算的续费。活跃会员需要已记录支付和下次续费日。'}
+          </p>
+        ) : (
+          <div className={`bars${spendView === 'future' ? ' future' : ''}`}>
+            {spendData.map((item, index) => (
+              <div className="bar-col" key={item.month} tabIndex={0}>
+                <div
+                  className="bar"
+                  style={{ height: `${Math.max(4, (item.total / spendMax) * 110)}px` }}
+                >
+                  <span className="bar-tip">
+                    {item.month} · {formatCNY(item.total)}
+                    {spendView === 'future' ? '（预计）' : ''}
+                  </span>
+                </div>
+                <span className="bar-label">
+                  {index % 2 === 0 || index === spendData.length - 1
+                    ? monthLabel(item.month)
+                    : ''}
                 </span>
               </div>
-              <span className="bar-label">
-                {index % 2 === 0 || index === stats.monthlySpend.length - 1
-                  ? monthLabel(item.month)
-                  : ''}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )
