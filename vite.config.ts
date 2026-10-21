@@ -1,8 +1,10 @@
+import { realpathSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
+  root: realpathSync.native(process.cwd()),
   plugins: [react()],
   resolve: {
     alias: {
@@ -15,6 +17,15 @@ export default defineConfig({
       scss: {
         api: 'modern-compiler',
       },
+    },
+  },
+  test: {
+    coverage: {
+      provider: 'istanbul',
+      include: ['src/**/*.{ts,tsx}', 'server/**/*.ts', 'shared/**/*.ts'],
+      exclude: ['tests/**'],
+      all: true,
+      reporter: ['text', 'html'],
     },
   },
 })
