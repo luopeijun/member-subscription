@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react'
 import { api } from '@/api'
 import type {
   AppState,
@@ -31,9 +31,12 @@ import './App.scss'
 
 type ToastState = { message: string; kind: ToastKind }
 
-type PaymentDeleteTarget =
+type DeleteTarget =
   | { kind: 'payment'; payment: Payment }
   | { kind: 'jointRenewal'; jointRenewal: JointRenewal }
+  | { kind: 'plan'; plan: Plan }
+  | { kind: 'snapshot'; snapshot: Snapshot }
+  | { kind: 'jointQuote'; jointQuote: JointQuote }
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null)
@@ -44,8 +47,8 @@ export default function App() {
   const [resetOpen, setResetOpen] = useState(false)
   const [resetAck, setResetAck] = useState(false)
   const [resetting, setResetting] = useState(false)
-  const [paymentDelete, setPaymentDelete] = useState<PaymentDeleteTarget | null>(null)
-  const [deletingPayment, setDeletingPayment] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [deletingTarget, setDeletingTarget] = useState(false)
 
   const load = async () => {
     setLoadError(null)
@@ -106,54 +109,54 @@ export default function App() {
   }
 
   const handleDeletePayment = (payment: Payment) => {
-    setPaymentDelete({ kind: 'payment', payment })
+    setDeleteTarget({ kind: 'payment', payment })
   }
 
   const handleDeleteJointRenewal = (jointRenewal: JointRenewal) => {
-    setPaymentDelete({ kind: 'jointRenewal', jointRenewal })
-  }
-
-  const confirmPaymentDelete = async () => {
-    if (!paymentDelete) return
-    setDeletingPayment(true)
-    const removed =
-      paymentDelete.kind === 'payment'
-        ? await remove(`/payments/${paymentDelete.payment.id}`, '已删除支付记录')
-        : await remove(
-            `/joint-renewals/${paymentDelete.jointRenewal.id}`,
-            '已删除联合续费记录',
-          )
-    setDeletingPayment(false)
-    if (removed) setPaymentDelete(null)
+    setDeleteTarget({ kind: 'jointRenewal', jointRenewal })
   }
 
   const handleDeletePlan = (plan: Plan) => {
-    if (!window.confirm(`删除套餐「${plan.serviceName} · ${plan.name}」及其比价记录？`)) {
-      return
-    }
-    void remove(`/plans/${plan.id}`, '已删除套餐')
+    setDeleteTarget({ kind: 'plan', plan })
   }
 
   const handleDeleteSnapshot = (snapshot: Snapshot) => {
-    if (
-      !window.confirm(
-        `删除「${snapshot.platform ?? '未标注'}」在 ${snapshot.capturedAt} 记录的报价？`,
-      )
-    ) {
-      return
-    }
-    void remove(`/snapshots/${snapshot.id}`, '已删除报价')
+    setDeleteTarget({ kind: 'snapshot', snapshot })
   }
 
   const handleDeleteJointQuote = (jointQuote: JointQuote) => {
-    if (
-      !window.confirm(
-        `删除「${jointQuote.platform ?? '未标注'}」在 ${jointQuote.capturedAt} 记录的联合报价？`,
-      )
-    ) {
-      return
+    setDeleteTarget({ kind: 'jointQuote', jointQuote })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeletingTarget(true)
+    let removed = false
+    switch (deleteTarget.kind) {
+      case 'payment':
+        removed = await remove(`/payments/${deleteTarget.payment.id}`, '已删除支付记录')
+        break
+      case 'jointRenewal':
+        removed = await remove(
+          `/joint-renewals/${deleteTarget.jointRenewal.id}`,
+          '已删除联合续费记录',
+        )
+        break
+      case 'plan':
+        removed = await remove(`/plans/${deleteTarget.plan.id}`, '已删除套餐')
+        break
+      case 'snapshot':
+        removed = await remove(`/snapshots/${deleteTarget.snapshot.id}`, '已删除报价')
+        break
+      case 'jointQuote':
+        removed = await remove(
+          `/joint-quotes/${deleteTarget.jointQuote.id}`,
+          '已删除联合报价',
+        )
+        break
     }
-    void remove(`/joint-quotes/${jointQuote.id}`, '已删除联合报价')
+    setDeletingTarget(false)
+    if (removed) setDeleteTarget(null)
   }
 
   const handleSeed = async () => {
@@ -230,6 +233,145 @@ export default function App() {
 
   const meta = PAGE_META[tab]
 
+  const deleteDialog: {
+    title: string
+    subtitle: string
+    confirmLabel: string
+    body: ReactNode
+  } | null = (() => {
+    if (!deleteTarget) return null
+    switch (deleteTarget.kind) {
+      case 'payment':
+        return {
+          title: '删除支付记录',
+          subtitle: `${deleteTarget.payment.serviceName} · ${deleteTarget.payment.planName}`,
+          confirmLabel: '删除支付',
+          body: (
+            <>
+              <p className="confirm-text">将删除这笔支付记录：</p>
+              <ul className="confirm-list">
+                <li>
+                  支付日期 <strong>{deleteTarget.payment.paidAt}</strong>
+                </li>
+                <li>
+                  金额 <strong>{formatCNY(deleteTarget.payment.amount)}</strong>
+                </li>
+              </ul>
+              <p className="confirm-hint">
+                删除后会重新计算月均成本和累计支出，但不会主动修改手填的下次续费日。
+              </p>
+            </>
+          ),
+        }
+      case 'jointRenewal':
+        return {
+          title: '删除联合续费记录',
+          subtitle: `${formatDate(deleteTarget.jointRenewal.paidAt)} · ${deleteTarget.jointRenewal.members.length} 个会员`,
+          confirmLabel: '删除联合续费',
+          body: (
+            <>
+              <p className="confirm-text">
+                将删除这条联合续费记录，以及关联的{' '}
+                {deleteTarget.jointRenewal.members.length} 笔支付：
+              </p>
+              <ul className="confirm-list">
+                <li>
+                  合计金额{' '}
+                  <strong>{formatCNY(deleteTarget.jointRenewal.total)}</strong>
+                </li>
+                <li>
+                  涉及会员{' '}
+                  <strong>
+                    {deleteTarget.jointRenewal.members
+                      .map((member) => member.serviceName)
+                      .join('、')}
+                  </strong>
+                </li>
+              </ul>
+              <p className="confirm-hint">
+                删除后会重新计算成本统计，但不会主动修改手填的下次续费日。
+              </p>
+            </>
+          ),
+        }
+      case 'plan':
+        return {
+          title: '删除套餐',
+          subtitle: `${deleteTarget.plan.serviceName} · ${deleteTarget.plan.name}`,
+          confirmLabel: '删除套餐',
+          body: (
+            <>
+              <p className="confirm-text">将删除这个套餐及其全部平台报价：</p>
+              <ul className="confirm-list">
+                <li>
+                  服务 <strong>{deleteTarget.plan.serviceName}</strong>
+                </li>
+                <li>
+                  套餐 <strong>{deleteTarget.plan.name}</strong>
+                </li>
+              </ul>
+              <p className="confirm-hint">
+                如果该套餐下还有会员记录，系统会阻止删除；需要先处理对应会员。删除后无法恢复。
+              </p>
+            </>
+          ),
+        }
+      case 'snapshot':
+        return {
+          title: '删除平台报价',
+          subtitle: `${deleteTarget.snapshot.serviceName} · ${deleteTarget.snapshot.planName}`,
+          confirmLabel: '删除报价',
+          body: (
+            <>
+              <p className="confirm-text">将删除这条平台报价：</p>
+              <ul className="confirm-list">
+                <li>
+                  平台 <strong>{deleteTarget.snapshot.platform ?? '未标注'}</strong>
+                </li>
+                <li>
+                  记录日期 <strong>{formatDate(deleteTarget.snapshot.capturedAt)}</strong>
+                </li>
+                <li>
+                  价格 <strong>{formatCNY(deleteTarget.snapshot.price)}</strong>
+                </li>
+              </ul>
+              <p className="confirm-hint">
+                只会删除这条比价记录，不会影响套餐本身，也不会修改已有支付记录。
+              </p>
+            </>
+          ),
+        }
+      case 'jointQuote':
+        return {
+          title: '删除联合报价',
+          subtitle: `${deleteTarget.jointQuote.platform ?? '未标注'} · ${formatDate(deleteTarget.jointQuote.capturedAt)} · ${deleteTarget.jointQuote.items.length} 个会员`,
+          confirmLabel: '删除联合报价',
+          body: (
+            <>
+              <p className="confirm-text">将删除这条联合报价：</p>
+              <ul className="confirm-list">
+                <li>
+                  捆绑包总价{' '}
+                  <strong>{formatCNY(deleteTarget.jointQuote.total)}</strong>
+                </li>
+                <li>
+                  涉及会员{' '}
+                  <strong>
+                    {deleteTarget.jointQuote.items
+                      .map((item) => item.serviceName)
+                      .join('、')}
+                  </strong>
+                </li>
+              </ul>
+              <p className="confirm-hint">
+                只会删除这条比价记录，不会生成或删除支付，也不会改变会员到期日。
+              </p>
+            </>
+          ),
+        }
+    }
+  })()
+
   return (
     <div className="app">
       <Topbar tab={tab} onTabChange={setTab} />
@@ -301,65 +443,18 @@ export default function App() {
         onClose={() => setResetOpen(false)}
       />
 
-      {paymentDelete ? (
+      {deleteDialog ? (
         <ConfirmDialog
-          title={
-            paymentDelete.kind === 'payment' ? '删除支付记录' : '删除联合续费记录'
-          }
-          subtitle={
-            paymentDelete.kind === 'payment'
-              ? `${paymentDelete.payment.serviceName} · ${paymentDelete.payment.planName}`
-              : `${formatDate(paymentDelete.jointRenewal.paidAt)} · ${paymentDelete.jointRenewal.members.length} 个会员`
-          }
-          confirmLabel={
-            paymentDelete.kind === 'payment' ? '删除支付' : '删除联合续费'
-          }
-          busy={deletingPayment}
-          onConfirm={() => void confirmPaymentDelete()}
+          title={deleteDialog.title}
+          subtitle={deleteDialog.subtitle}
+          confirmLabel={deleteDialog.confirmLabel}
+          busy={deletingTarget}
+          onConfirm={() => void confirmDelete()}
           onClose={() => {
-            if (!deletingPayment) setPaymentDelete(null)
+            if (!deletingTarget) setDeleteTarget(null)
           }}
         >
-          {paymentDelete.kind === 'payment' ? (
-            <>
-              <p className="confirm-text">将删除这笔支付记录：</p>
-              <ul className="confirm-list">
-                <li>
-                  支付日期 <strong>{paymentDelete.payment.paidAt}</strong>
-                </li>
-                <li>
-                  金额 <strong>{formatCNY(paymentDelete.payment.amount)}</strong>
-                </li>
-              </ul>
-              <p className="confirm-hint">
-                删除后会重新计算月均成本和累计支出，但不会主动修改手填的下次续费日。
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="confirm-text">
-                将删除这条联合续费记录，以及关联的{' '}
-                {paymentDelete.jointRenewal.members.length} 笔支付：
-              </p>
-              <ul className="confirm-list">
-                <li>
-                  合计金额{' '}
-                  <strong>{formatCNY(paymentDelete.jointRenewal.total)}</strong>
-                </li>
-                <li>
-                  涉及会员{' '}
-                  <strong>
-                    {paymentDelete.jointRenewal.members
-                      .map((member) => member.serviceName)
-                      .join('、')}
-                  </strong>
-                </li>
-              </ul>
-              <p className="confirm-hint">
-                删除后会重新计算成本统计，但不会主动修改手填的下次续费日。
-              </p>
-            </>
-          )}
+          {deleteDialog.body}
         </ConfirmDialog>
       ) : null}
 
