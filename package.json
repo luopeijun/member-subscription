@@ -7,6 +7,8 @@
     "dev": "tsx watch --exclude \"src/**\" --exclude \"data/**\" --exclude \"dist/**\" --exclude \"vite.config.ts.timestamp-*\" server/index.ts",
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts --prod",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -26,6 +28,7 @@
     "sass": "^1.105.2",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^2.1.9"
   }
 }

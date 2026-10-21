@@ -19,5 +19,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src", "server", "shared", "vite.config.ts"]
+  "include": ["src", "server", "shared", "tests", "vite.config.ts"]
 }
