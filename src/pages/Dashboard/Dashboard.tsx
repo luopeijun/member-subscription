@@ -218,7 +218,7 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
               <div className="donut" aria-label="分类月均占比图">
                 {categorySum > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
+                    <PieChart accessibilityLayer={false}>
                       <Pie
                         data={categoryData}
                         dataKey="annualized"
@@ -230,6 +230,7 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
                         paddingAngle={categoryData.length > 1 ? 1.5 : 0}
                         startAngle={90}
                         endAngle={-270}
+                        rootTabIndex={-1}
                         stroke="none"
                         isAnimationActive={false}
                       >

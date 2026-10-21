@@ -148,6 +148,20 @@
   flex: none;
 }
 
+.donut .recharts-wrapper,
+.donut .recharts-wrapper * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.donut .recharts-wrapper:focus,
+.donut .recharts-wrapper *:focus {
+  outline: none;
+}
+
+.donut .recharts-tooltip-wrapper {
+  z-index: 10;
+}
+
 .donut-empty {
   position: absolute;
   inset: 0;
