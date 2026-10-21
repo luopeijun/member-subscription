@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { AppState, Subscription } from '@/types'
 import { formatCNY } from '@shared/money'
 import { DaysBadge } from '@/components/Badge/Badge'
@@ -28,6 +29,44 @@ const CATEGORY_COLORS = [
   '#ec4899',
   '#84cc16',
 ]
+
+type CategoryDatum = {
+  name: string
+  annualized: number
+  monthly: number
+  count: number
+  percent: number
+  color: string
+}
+
+type CategoryTooltipProps = {
+  active?: boolean
+  payload?: Array<{ payload?: CategoryDatum }>
+}
+
+function CategoryTooltip({ active, payload }: CategoryTooltipProps) {
+  const item = payload?.[0]?.payload
+  if (!active || !item) return null
+
+  return (
+    <div className="cat-tooltip">
+      <div className="cat-tooltip-head">
+        <span className="legend-dot" style={{ background: item.color }} />
+        <strong>{item.name}</strong>
+      </div>
+      <div className="cat-tooltip-row">
+        <span>月均</span>
+        <strong>{formatCNY(item.monthly)}</strong>
+      </div>
+      <div className="cat-tooltip-row">
+        <span>占比</span>
+        <span>
+          {item.percent}% · {item.count} 个
+        </span>
+      </div>
+    </div>
+  )
+}
 
 export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
   const { stats, subscriptions } = state
@@ -61,14 +100,14 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
   const subscriptionById = new Map(subscriptions.map((sub) => [sub.id, sub]))
   const categorySum = stats.categories.reduce((sum, item) => sum + item.annualized, 0)
   const categoryTotal = Math.max(categorySum, 1)
-  let categoryCursor = 0
-  const categoryStops = stats.categories.map((item, index) => {
-    const start = categoryCursor
-    categoryCursor += (item.annualized / categoryTotal) * 100
-    return `${CATEGORY_COLORS[index % CATEGORY_COLORS.length]} ${start}% ${categoryCursor}%`
-  })
-  const donutBackground =
-    categorySum > 0 ? `conic-gradient(${categoryStops.join(', ')})` : '#f1f3f7'
+  const categoryData: CategoryDatum[] = stats.categories.map((item, index) => ({
+    name: item.category,
+    annualized: item.annualized,
+    monthly: Math.round(item.annualized / 12),
+    count: item.count,
+    percent: Math.round((item.annualized / categoryTotal) * 100),
+    color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+  }))
 
   const activeSubscriptions = subscriptions.filter((sub) => sub.status === 'active')
   const activeMonthlyTotal = activeSubscriptions.reduce(
@@ -176,32 +215,56 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
             <p className="muted pad-y">暂无活跃会员。</p>
           ) : (
             <div className="cat-chart">
-              <div className="donut" style={{ background: donutBackground }}>
+              <div className="donut" aria-label="分类月均占比图">
+                {categorySum > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        dataKey="annualized"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="62%"
+                        outerRadius="95%"
+                        paddingAngle={categoryData.length > 1 ? 1.5 : 0}
+                        startAngle={90}
+                        endAngle={-270}
+                        stroke="none"
+                        isAnimationActive={false}
+                      >
+                        {categoryData.map((item) => (
+                          <Cell key={item.name} fill={item.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CategoryTooltip />} cursor={false} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="donut-empty" />
+                )}
                 <div className="donut-center">
                   <span>月均合计</span>
                   <strong>{formatCNY(Math.round(categorySum / 12))}</strong>
                 </div>
               </div>
               <div className="cat-legend">
-                {stats.categories.map((item, index) => {
-                  const percent = Math.round((item.annualized / categoryTotal) * 100)
-                  return (
-                    <div className="cat-legend-row" key={item.category}>
-                      <span
-                        className="legend-dot"
-                        style={{ background: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }}
-                      />
-                      <span className="legend-name">
-                        {item.category}
-                        <small>{item.count} 个</small>
-                      </span>
-                      <strong className="legend-value">
-                        {formatCNY(Math.round(item.annualized / 12))}
-                      </strong>
-                      <span className="legend-pct">{percent}%</span>
-                    </div>
-                  )
-                })}
+                {categoryData.map((item) => (
+                  <div className="cat-legend-row" key={item.name}>
+                    <span
+                      className="legend-dot"
+                      style={{ background: item.color }}
+                    />
+                    <span className="legend-name">
+                      {item.name}
+                      <small>{item.count} 个</small>
+                    </span>
+                    <strong className="legend-value">
+                      {formatCNY(item.monthly)}
+                    </strong>
+                    <span className="legend-pct">{item.percent}%</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
