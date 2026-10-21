@@ -146,6 +146,7 @@
 - 数据库：SQLite（better-sqlite3，WAL 模式）
 - 样式：SCSS
 - 图表：Recharts（分类环形图、会员 Top 6、月度支出图）
+- 测试：Vitest（金额、日期、周期、续费预测和报价等工具函数）
 - 开发模式下 Vite 以中间件方式运行在 Express 中，前后端同端口
 
 ## 快速开始
@@ -181,7 +182,13 @@ PORT=8080 HOST=0.0.0.0 npm start
 | `npm run dev` | 开发模式，Vite + API 同一进程 |
 | `npm run build` | TypeScript 检查并构建前端 |
 | `npm start` | 生产模式，服务 `dist/` 和 API |
+| `npm test` | 运行全部单元测试 |
+| `npm run test:watch` | 监听文件变化并运行测试 |
 | `npm run typecheck` | 只做 TypeScript 类型检查 |
+
+## 测试
+
+`npm test` 会运行 `tests/` 下的 Vitest 单元测试，当前覆盖金额换算、日期与周期、续费预测、报价校验与分摊、排序、导入和标签页记忆等纯函数。
 
 ## 数据与备份
 
@@ -204,6 +211,7 @@ server/
 shared/
   money.ts      分 / 元转换与金额格式化
   duration.ts   时长、日期与快捷选项
+tests/          Vitest 单元测试与测试数据工厂
 src/
   components/   通用组件（弹窗、表单、选择器、分页、提示等）
   pages/        总览、会员、流水、比价
