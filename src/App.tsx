@@ -17,16 +17,23 @@ import { Compare } from '@/pages/Compare/Compare'
 import { AppFooter } from '@/components/AppFooter/AppFooter'
 import { AppModals, type ModalState } from '@/components/AppModals/AppModals'
 import { BootScreen } from '@/components/BootScreen/BootScreen'
+import { ConfirmDialog } from '@/components/ConfirmDialog/ConfirmDialog'
 import { PageHeader } from '@/components/PageHeader/PageHeader'
 import { ResetDataDialog } from '@/components/ResetDataDialog/ResetDataDialog'
 import { Toast, type ToastKind } from '@/components/Toast/Toast'
 import { Topbar } from '@/components/Topbar/Topbar'
+import { formatCNY } from '@shared/money'
 import { downloadJson } from '@/utils/download'
+import { formatDate } from '@/utils/format'
 import { formatImportSummary, readJsonFile, type ImportSummary } from '@/utils/import'
 import { readStoredTab, storeTab } from '@/utils/tab'
 import './App.scss'
 
 type ToastState = { message: string; kind: ToastKind }
+
+type PaymentDeleteTarget =
+  | { kind: 'payment'; payment: Payment }
+  | { kind: 'jointRenewal'; jointRenewal: JointRenewal }
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null)
@@ -37,6 +44,8 @@ export default function App() {
   const [resetOpen, setResetOpen] = useState(false)
   const [resetAck, setResetAck] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [paymentDelete, setPaymentDelete] = useState<PaymentDeleteTarget | null>(null)
+  const [deletingPayment, setDeletingPayment] = useState(false)
 
   const load = async () => {
     setLoadError(null)
@@ -78,8 +87,10 @@ export default function App() {
     try {
       setState(await api<AppState>(path, { method: 'DELETE' }))
       notify(message)
+      return true
     } catch (error) {
       notify((error as Error).message, 'err')
+      return false
     }
   }
 
@@ -95,25 +106,25 @@ export default function App() {
   }
 
   const handleDeletePayment = (payment: Payment) => {
-    if (
-      !window.confirm(
-        `删除 ${payment.paidAt} 的支付记录？\n${payment.serviceName} · ${payment.planName}`,
-      )
-    ) {
-      return
-    }
-    void remove(`/payments/${payment.id}`, '已删除支付记录')
+    setPaymentDelete({ kind: 'payment', payment })
   }
 
   const handleDeleteJointRenewal = (jointRenewal: JointRenewal) => {
-    if (
-      !window.confirm(
-        `删除 ${jointRenewal.paidAt} 的联合续费记录？\n会同时删除关联的 ${jointRenewal.members.length} 笔支付，但不会回退会员到期日。`,
-      )
-    ) {
-      return
-    }
-    void remove(`/joint-renewals/${jointRenewal.id}`, '已删除联合续费记录')
+    setPaymentDelete({ kind: 'jointRenewal', jointRenewal })
+  }
+
+  const confirmPaymentDelete = async () => {
+    if (!paymentDelete) return
+    setDeletingPayment(true)
+    const removed =
+      paymentDelete.kind === 'payment'
+        ? await remove(`/payments/${paymentDelete.payment.id}`, '已删除支付记录')
+        : await remove(
+            `/joint-renewals/${paymentDelete.jointRenewal.id}`,
+            '已删除联合续费记录',
+          )
+    setDeletingPayment(false)
+    if (removed) setPaymentDelete(null)
   }
 
   const handleDeletePlan = (plan: Plan) => {
@@ -289,6 +300,68 @@ export default function App() {
         onConfirm={() => void handleReset()}
         onClose={() => setResetOpen(false)}
       />
+
+      {paymentDelete ? (
+        <ConfirmDialog
+          title={
+            paymentDelete.kind === 'payment' ? '删除支付记录' : '删除联合续费记录'
+          }
+          subtitle={
+            paymentDelete.kind === 'payment'
+              ? `${paymentDelete.payment.serviceName} · ${paymentDelete.payment.planName}`
+              : `${formatDate(paymentDelete.jointRenewal.paidAt)} · ${paymentDelete.jointRenewal.members.length} 个会员`
+          }
+          confirmLabel={
+            paymentDelete.kind === 'payment' ? '删除支付' : '删除联合续费'
+          }
+          busy={deletingPayment}
+          onConfirm={() => void confirmPaymentDelete()}
+          onClose={() => {
+            if (!deletingPayment) setPaymentDelete(null)
+          }}
+        >
+          {paymentDelete.kind === 'payment' ? (
+            <>
+              <p className="confirm-text">将删除这笔支付记录：</p>
+              <ul className="confirm-list">
+                <li>
+                  支付日期 <strong>{paymentDelete.payment.paidAt}</strong>
+                </li>
+                <li>
+                  金额 <strong>{formatCNY(paymentDelete.payment.amount)}</strong>
+                </li>
+              </ul>
+              <p className="confirm-hint">
+                删除后会重新计算月均成本和累计支出，但不会主动修改手填的下次续费日。
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="confirm-text">
+                将删除这条联合续费记录，以及关联的{' '}
+                {paymentDelete.jointRenewal.members.length} 笔支付：
+              </p>
+              <ul className="confirm-list">
+                <li>
+                  合计金额{' '}
+                  <strong>{formatCNY(paymentDelete.jointRenewal.total)}</strong>
+                </li>
+                <li>
+                  涉及会员{' '}
+                  <strong>
+                    {paymentDelete.jointRenewal.members
+                      .map((member) => member.serviceName)
+                      .join('、')}
+                  </strong>
+                </li>
+              </ul>
+              <p className="confirm-hint">
+                删除后会重新计算成本统计，但不会主动修改手填的下次续费日。
+              </p>
+            </>
+          )}
+        </ConfirmDialog>
+      ) : null}
 
       {toast ? <Toast message={toast.message} kind={toast.kind} /> : null}
     </div>
