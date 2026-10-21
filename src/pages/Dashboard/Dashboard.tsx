@@ -212,6 +212,7 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
         ? Math.round((item.monthly / activeMonthlyTotal) * 100)
         : 0,
   }))
+  const topMaxMonthly = Math.max(...topData.map((item) => item.monthly), 1)
   const renderTopTick = (props: unknown) => {
     const { x = 0, y = 0, payload } = props as TopMemberTickProps
     const item = topData[payload?.index ?? -1]
@@ -219,12 +220,15 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
 
     return (
       <g transform={`translate(${x}, ${y})`}>
-        <text className="top-tick-name" x={-8} y={-2} textAnchor="end">
-          <tspan className="top-tick-rank">{item.rank}</tspan>
-          <tspan dx={5}>{truncateLabel(item.name, 8)}</tspan>
+        <circle className="top-tick-badge" cx={-112} cy={0} r={9} />
+        <text className="top-tick-rank" x={-112} y={3.5} textAnchor="middle">
+          {item.rank}
         </text>
-        <text className="top-tick-plan" x={-8} y={10} textAnchor="end">
-          {truncateLabel(item.planName, 10)}
+        <text className="top-tick-name" x={-96} y={-2} textAnchor="start">
+          {truncateLabel(item.name, 7)}
+        </text>
+        <text className="top-tick-plan" x={-96} y={11} textAnchor="start">
+          {truncateLabel(item.planName, 9)}
         </text>
       </g>
     )
@@ -402,13 +406,13 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
           >
             <ResponsiveContainer
               width="100%"
-              height={Math.max(80, topData.length * 30 + 8)}
+              height={Math.max(92, topData.length * 38 + 8)}
             >
               <BarChart
                 data={topData}
                 layout="vertical"
-                margin={{ top: 2, right: 64, bottom: 2, left: 0 }}
-                barCategoryGap="24%"
+                margin={{ top: 4, right: 76, bottom: 4, left: 0 }}
+                barCategoryGap="30%"
                 accessibilityLayer={false}
               >
                 <defs>
@@ -417,11 +421,11 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
                     <stop offset="100%" stopColor="#4f46e5" />
                   </linearGradient>
                 </defs>
-                <XAxis type="number" hide />
+                <XAxis type="number" hide domain={[0, topMaxMonthly]} />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  width={116}
+                  width={132}
                   axisLine={false}
                   tickLine={false}
                   tick={renderTopTick}
@@ -433,19 +437,36 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
                 <Bar
                   dataKey="monthly"
                   fill="url(#topBarGradient)"
-                  radius={[0, 6, 6, 0]}
-                  barSize={10}
+                  radius={[0, 7, 7, 0]}
+                  barSize={14}
                   background={{ fill: '#f1f3f7', radius: 999 }}
                   isAnimationActive={false}
                 >
                   <LabelList
                     dataKey="monthly"
-                    position="right"
-                    formatter={(value) => formatCNY(Number(value))}
-                    style={{
-                      fill: '#131722',
-                      fontSize: 11.5,
-                      fontVariantNumeric: 'tabular-nums',
+                    content={(props) => {
+                      const { x = 0, y = 0, width = 0, height = 0, index } =
+                        props as {
+                          x?: number
+                          y?: number
+                          width?: number
+                          height?: number
+                          index?: number
+                        }
+                      const item = topData[index ?? -1]
+                      if (!item) return null
+                      return (
+                        <g
+                          transform={`translate(${x + width + 10}, ${y + height / 2})`}
+                        >
+                          <text className="top-label-value" x={0} y={-2}>
+                            {formatCNY(item.monthly)}
+                          </text>
+                          <text className="top-label-share" x={0} y={11}>
+                            {item.share}%
+                          </text>
+                        </g>
+                      )
                     }}
                   />
                 </Bar>

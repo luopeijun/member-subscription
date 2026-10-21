@@ -284,11 +284,17 @@
 
 .top-chart {
   width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.top-tick-badge {
+  fill: var(--accent-soft);
 }
 
 .top-tick-name {
   fill: var(--text);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -298,6 +304,20 @@
 }
 
 .top-tick-rank {
+  fill: var(--accent-deep);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-label-value {
+  fill: var(--text);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-label-share {
   fill: var(--muted);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
