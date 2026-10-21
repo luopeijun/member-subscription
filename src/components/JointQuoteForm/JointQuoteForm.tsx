@@ -155,6 +155,10 @@ export function JointQuoteForm({
         costMode,
         platform: platform.trim(),
         note: note.trim() || null,
+        items: selected.map((item) => ({
+          subscriptionId: item.id,
+          durationDays: item.days,
+        })),
       }
       const next = editing
         ? await api<AppState>(`/joint-quotes/${editing.id}`, {
@@ -163,13 +167,7 @@ export function JointQuoteForm({
           })
         : await api<AppState>('/joint-quotes', {
             method: 'POST',
-            body: JSON.stringify({
-              ...payload,
-              items: selected.map((item) => ({
-                subscriptionId: item.id,
-                durationDays: item.days,
-              })),
-            }),
+            body: JSON.stringify(payload),
           })
       onSaved(next, editing ? '联合报价已更新' : '联合报价已记录')
     } catch (caught) {
@@ -184,7 +182,7 @@ export function JointQuoteForm({
       title={isEdit ? '编辑联合报价' : '记录联合报价'}
       subtitle={
         isEdit
-          ? '只能修改报价信息，参与会员、套餐和时长保持不变'
+          ? '可以调整已有会员时长，但不能添加新会员进包'
           : '一次购买多个会员的捆绑总价，与相同服务时长下的当前组合成本对比'
       }
       onClose={onClose}
@@ -220,7 +218,7 @@ export function JointQuoteForm({
           </div>
         ) : (
           <p className="joint-hint">
-            编辑时只能调整平台、总价、费用归属、日期和备注；参与会员、套餐和时长不会改变。
+            编辑时可以调整已有会员的时长，以及平台、总价、费用归属、日期和备注；会员组合固定，不能添加或移除会员。
           </p>
         )}
 
@@ -248,7 +246,6 @@ export function JointQuoteForm({
                       max={3650}
                       value={entry.days}
                       aria-label={`${entry.sub.serviceName} 时长（天）`}
-                      disabled={isEdit}
                       onChange={(event) =>
                         updateItem(entry.id, clampDurationDays(event.target.value))
                       }

@@ -895,6 +895,16 @@ apiRouter.put(
       .get(id) as { id: number } | undefined
     if (!quote) throw new HttpError(404, '联合报价不存在')
 
+    const existingItems = db
+      .prepare(
+        `SELECT subscription_id, duration_days
+         FROM joint_quote_items
+         WHERE joint_quote_id = ?
+         ORDER BY id`,
+      )
+      .all(id) as { subscription_id: number; duration_days: number | null }[]
+    const memberIds = new Set(existingItems.map((item) => item.subscription_id))
+
     const body = req.body ?? {}
     const capturedAt = date(body.capturedAt, '记录日期')
     const total = integer(body.total, '整条报价', 0, 1_000_000_000_000)
@@ -902,22 +912,58 @@ apiRouter.put(
     const platform = text(body.platform, '平台', 60)
     const note = optionalText(body.note, 300)
     const mainSubscriptionId = integer(body.mainSubscriptionId, '费用归属会员', 1)
-    const member = db
-      .prepare(
-        'SELECT 1 FROM joint_quote_items WHERE joint_quote_id = ? AND subscription_id = ?',
-      )
-      .get(id, mainSubscriptionId)
-    if (!member) {
+    if (!memberIds.has(mainSubscriptionId)) {
       throw new HttpError(400, '费用归属会员必须在报价会员中')
     }
 
-    // 套餐成员和时长属于创建时的组合信息，编辑只更新报价本身。
-    db.prepare(
-      `UPDATE joint_quotes
-       SET captured_at = ?, total = ?, main_subscription_id = ?, cost_mode = ?,
-           platform = ?, note = ?
-       WHERE id = ?`,
-    ).run(capturedAt, total, mainSubscriptionId, mode, platform, note, id)
+    // 编辑可以调整已有会员的时长，但不能通过新增或删除成员改变套餐组合。
+    let items: JointMemberInput[] | null = null
+    if (body.items !== undefined) {
+      items = parseMembers(body.items, '报价会员')
+      const sameMembers =
+        items.length === existingItems.length &&
+        items.every((item) => memberIds.has(item.subscriptionId))
+      if (!sameMembers) {
+        throw new HttpError(400, '编辑时不能添加或删除联合报价会员')
+      }
+    }
+
+    const durations = items
+      ? items.map((item) => item.days)
+      : existingItems.map((item) => item.duration_days ?? 0)
+    const bundleMonths = Math.max(
+      ...durations.map((days) => Math.round(days / DAYS_PER_MONTH)),
+      0,
+    )
+
+    db.transaction(() => {
+      db.prepare(
+        `UPDATE joint_quotes
+         SET captured_at = ?, total = ?, cycle_months = ?, main_subscription_id = ?,
+             cost_mode = ?, platform = ?, note = ?
+         WHERE id = ?`,
+      ).run(
+        capturedAt,
+        total,
+        bundleMonths,
+        mainSubscriptionId,
+        mode,
+        platform,
+        note,
+        id,
+      )
+
+      if (items) {
+        const updateDuration = db.prepare(
+          `UPDATE joint_quote_items
+           SET duration_days = ?
+           WHERE joint_quote_id = ? AND subscription_id = ?`,
+        )
+        for (const item of items) {
+          updateDuration.run(item.days, id, item.subscriptionId)
+        }
+      }
+    })()
 
     res.json(buildState())
   }),
