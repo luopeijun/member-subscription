@@ -1,8 +1,10 @@
 import type {
+  AppState,
   JointQuote,
   JointQuoteItem,
   Plan,
   Snapshot,
+  Stats,
   Subscription,
 } from '@/types'
 
@@ -95,6 +97,36 @@ export function makeJointQuote(overrides: Partial<JointQuote> = {}): JointQuote 
     platform: null,
     note: null,
     items: [],
+    ...overrides,
+  }
+}
+
+export function makeStats(overrides: Partial<Stats> = {}): Stats {
+  return {
+    activeCount: 0,
+    annualized: 0,
+    monthly: 0,
+    totalSpent: 0,
+    upcoming30: 0,
+    expiredCount: 0,
+    categories: [],
+    monthlySpend: [],
+    upcoming: [],
+    ...overrides,
+  }
+}
+
+export function makeAppState(overrides: Partial<AppState> = {}): AppState {
+  return {
+    today: '2026-10-21',
+    services: [],
+    plans: [],
+    subscriptions: [],
+    payments: [],
+    jointRenewals: [],
+    snapshots: [],
+    jointQuotes: [],
+    stats: makeStats(),
     ...overrides,
   }
 }
