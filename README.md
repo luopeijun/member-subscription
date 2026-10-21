@@ -182,13 +182,13 @@ PORT=8080 HOST=0.0.0.0 npm start
 | `npm run dev` | 开发模式，Vite + API 同一进程 |
 | `npm run build` | TypeScript 检查并构建前端 |
 | `npm start` | 生产模式，服务 `dist/` 和 API |
-| `npm test` | 运行全部单元测试 |
+| `npm test` | 运行全部测试 |
 | `npm run test:watch` | 监听文件变化并运行测试 |
 | `npm run typecheck` | 只做 TypeScript 类型检查 |
 
 ## 测试
 
-`npm test` 会运行 `tests/` 下的 Vitest 单元测试，当前覆盖金额换算、日期与周期、续费预测、报价校验与分摊、排序、导入导出、标签页记忆，以及服务端参数校验、联合报价费用分摊和状态聚合。
+`npm test` 会运行 `tests/` 下的 Vitest 测试，当前覆盖金额换算、日期与周期、续费预测、报价校验与分摊、排序、导入导出、标签页记忆，以及服务端参数校验、联合报价费用分摊和状态聚合。组件测试使用 jsdom 和 Testing Library 覆盖支付表单、联合报价表单、比价页独立分页，以及会员页固定每页 9 条。
 
 涉及数据库的测试会通过 `SUBLEDGER_DB_PATH` 指向临时 SQLite 文件，不会读写 `data/app.db`。
 
@@ -215,7 +215,7 @@ server/
 shared/
   money.ts      分 / 元转换与金额格式化
   duration.ts   时长、日期与快捷选项
-tests/          Vitest 单元测试与测试数据工厂
+tests/          Vitest 单元 / 组件测试与测试数据工厂
 src/
   components/   通用组件（弹窗、表单、选择器、分页、提示等）
   pages/        总览、会员、流水、比价
