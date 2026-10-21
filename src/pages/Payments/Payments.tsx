@@ -14,6 +14,8 @@ type PaymentsProps = {
   onDeleteJointRenewal: (jointRenewal: JointRenewal) => void
 }
 
+type FlowTab = 'payments' | 'joint'
+
 function inDateRange(paidAt: string, fromDate: string, toDate: string): boolean {
   if (fromDate && toDate && fromDate > toDate) return false
   if (fromDate && paidAt < fromDate) return false
@@ -25,8 +27,11 @@ export function Payments({ state, onDelete, onDeleteJointRenewal }: PaymentsProp
   const [query, setQuery] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [flowTab, setFlowTab] = useState<FlowTab>('payments')
+  const [paymentPage, setPaymentPage] = useState(1)
+  const [paymentPageSize, setPaymentPageSize] = useState(10)
+  const [jointPage, setJointPage] = useState(1)
+  const [jointPageSize, setJointPageSize] = useState(10)
   const keyword = query.trim().toLowerCase()
   const dateRangeInvalid = Boolean(fromDate && toDate && fromDate > toDate)
 
@@ -71,63 +76,112 @@ export function Payments({ state, onDelete, onDeleteJointRenewal }: PaymentsProp
     [dateScopedJointRenewals, keyword],
   )
 
-  const total = dateScopedPayments.reduce((sum, payment) => sum + payment.amount, 0)
-  const average =
-    dateScopedPayments.length > 0 ? Math.round(total / dateScopedPayments.length) : 0
-  const totalPages = Math.max(1, Math.ceil(list.length / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const pageItems = list.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const paymentTotal = list.reduce((sum, payment) => sum + payment.amount, 0)
+  const paymentAverage = list.length > 0 ? Math.round(paymentTotal / list.length) : 0
+  const jointTotal = jointRenewals.reduce((sum, renewal) => sum + renewal.total, 0)
+  const jointAverage = jointRenewals.length > 0 ? Math.round(jointTotal / jointRenewals.length) : 0
+
+  const paymentTotalPages = Math.max(1, Math.ceil(list.length / paymentPageSize))
+  const currentPaymentPage = Math.min(paymentPage, paymentTotalPages)
+  const paymentPageItems = list.slice(
+    (currentPaymentPage - 1) * paymentPageSize,
+    currentPaymentPage * paymentPageSize,
+  )
+
+  const jointTotalPages = Math.max(1, Math.ceil(jointRenewals.length / jointPageSize))
+  const currentJointPage = Math.min(jointPage, jointTotalPages)
+  const jointPageItems = jointRenewals.slice(
+    (currentJointPage - 1) * jointPageSize,
+    currentJointPage * jointPageSize,
+  )
+
+  const resetPages = () => {
+    setPaymentPage(1)
+    setJointPage(1)
+  }
 
   const changeQuery = (value: string) => {
     setQuery(value)
-    setPage(1)
+    resetPages()
   }
 
   const changeFromDate = (value: string) => {
     setFromDate(value)
-    setPage(1)
+    resetPages()
   }
 
   const changeToDate = (value: string) => {
     setToDate(value)
-    setPage(1)
+    resetPages()
   }
 
   const clearDateRange = () => {
     setFromDate('')
     setToDate('')
-    setPage(1)
+    resetPages()
   }
 
   const clearFilters = () => {
     setQuery('')
     setFromDate('')
     setToDate('')
-    setPage(1)
+    resetPages()
   }
 
   const hasFilters = Boolean(keyword || fromDate || toDate)
   const hasAnything = state.payments.length > 0 || state.jointRenewals.length > 0
-  const hasMatches = jointRenewals.length > 0 || list.length > 0
+
+  const emptyDescription = (kind: FlowTab): string => {
+    if (dateRangeInvalid) return '开始日期不能晚于结束日期。'
+    if (keyword && (fromDate || toDate)) {
+      return kind === 'payments'
+        ? '当前搜索和日期范围内没有普通续费记录。'
+        : '当前搜索和日期范围内没有联合续费记录。'
+    }
+    if (keyword) {
+      return kind === 'payments'
+        ? `会员名称里没有包含「${query.trim()}」的普通续费记录。`
+        : `会员名称里没有包含「${query.trim()}」的联合续费记录。`
+    }
+    if (fromDate || toDate) {
+      return kind === 'payments'
+        ? '所选日期范围内没有普通续费记录。'
+        : '所选日期范围内没有联合续费记录。'
+    }
+    return kind === 'payments'
+      ? '在会员卡片上记录续费后，普通续费流水会出现在这里。'
+      : '在会员页使用「联合续费」后，整条购买记录会出现在这里。'
+  }
 
   return (
     <div className="stack">
       <div className="toolbar">
         <div className="inline-stats">
-          <span>
-            共 <strong>{dateScopedPayments.length}</strong> 笔
-          </span>
-          {dateScopedJointRenewals.length > 0 ? (
-            <span>
-              联合续费 <strong>{dateScopedJointRenewals.length}</strong> 条
-            </span>
-          ) : null}
-          <span>
-            合计 <strong>{formatCNY(total)}</strong>
-          </span>
-          <span>
-            单笔均值 <strong>{formatCNY(average)}</strong>
-          </span>
+          {flowTab === 'payments' ? (
+            <>
+              <span>
+                共 <strong>{list.length}</strong> 笔
+              </span>
+              <span>
+                合计 <strong>{formatCNY(paymentTotal)}</strong>
+              </span>
+              <span>
+                单笔均值 <strong>{formatCNY(paymentAverage)}</strong>
+              </span>
+            </>
+          ) : (
+            <>
+              <span>
+                共 <strong>{jointRenewals.length}</strong> 条
+              </span>
+              <span>
+                合计 <strong>{formatCNY(jointTotal)}</strong>
+              </span>
+              <span>
+                单条均值 <strong>{formatCNY(jointAverage)}</strong>
+              </span>
+            </>
+          )}
         </div>
         <div className="toolbar-right">
           <div
@@ -178,19 +232,72 @@ export function Payments({ state, onDelete, onDeleteJointRenewal }: PaymentsProp
         </div>
       ) : (
         <>
-          {!hasMatches ? (
+          <div className="flow-tabs" role="tablist" aria-label="流水类型">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={flowTab === 'payments'}
+              className={`flow-tab${flowTab === 'payments' ? ' active' : ''}`}
+              onClick={() => setFlowTab('payments')}
+            >
+              普通续费
+              <span>{list.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={flowTab === 'joint'}
+              className={`flow-tab${flowTab === 'joint' ? ' active' : ''}`}
+              onClick={() => setFlowTab('joint')}
+            >
+              联合续费
+              <span>{jointRenewals.length}</span>
+            </button>
+          </div>
+
+          {flowTab === 'payments' ? (
+            list.length === 0 ? (
+              <div className="card card-pad">
+                <EmptyState
+                  title={hasFilters ? '没有找到普通续费记录' : '还没有普通续费记录'}
+                  description={emptyDescription('payments')}
+                  action={
+                    hasFilters ? (
+                      <button className="btn" onClick={clearFilters}>
+                        清除筛选
+                      </button>
+                    ) : undefined
+                  }
+                />
+              </div>
+            ) : (
+              <>
+                <div className="pay-list">
+                  <div className="pay-head" aria-hidden="true">
+                    <span>支付日期</span>
+                    <span>会员</span>
+                    <span className="num">金额</span>
+                    <span>备注</span>
+                    <span />
+                  </div>
+                  {paymentPageItems.map((payment) => (
+                    <PaymentRow key={payment.id} payment={payment} onDelete={onDelete} />
+                  ))}
+                </div>
+                <Pagination
+                  page={currentPaymentPage}
+                  pageSize={paymentPageSize}
+                  total={list.length}
+                  onPageChange={setPaymentPage}
+                  onPageSizeChange={setPaymentPageSize}
+                />
+              </>
+            )
+          ) : jointRenewals.length === 0 ? (
             <div className="card card-pad">
               <EmptyState
-                title="没有找到匹配的流水"
-                description={
-                  dateRangeInvalid
-                    ? '开始日期不能晚于结束日期。'
-                    : keyword && (fromDate || toDate)
-                      ? '当前搜索和日期范围内没有支付记录。'
-                      : keyword
-                        ? `会员名称里没有包含「${query.trim()}」的支付记录。`
-                        : '所选日期范围内没有支付记录。'
-                }
+                title={hasFilters ? '没有找到联合续费记录' : '还没有联合续费记录'}
+                description={emptyDescription('joint')}
                 action={
                   hasFilters ? (
                     <button className="btn" onClick={clearFilters}>
@@ -200,13 +307,10 @@ export function Payments({ state, onDelete, onDeleteJointRenewal }: PaymentsProp
                 }
               />
             </div>
-          ) : null}
-
-          {jointRenewals.length > 0 ? (
-            <section className="stack">
-              <h3 className="section-title">联合续费</h3>
+          ) : (
+            <>
               <div className="joint-renewal-list">
-                {jointRenewals.map((renewal) => (
+                {jointPageItems.map((renewal) => (
                   <JointRenewalCard
                     key={renewal.id}
                     renewal={renewal}
@@ -214,32 +318,15 @@ export function Payments({ state, onDelete, onDeleteJointRenewal }: PaymentsProp
                   />
                 ))}
               </div>
-            </section>
-          ) : null}
-
-          {list.length > 0 ? (
-            <>
-              <div className="pay-list">
-                <div className="pay-head" aria-hidden="true">
-                  <span>支付日期</span>
-                  <span>会员</span>
-                  <span className="num">金额</span>
-                  <span>备注</span>
-                  <span />
-                </div>
-                {pageItems.map((payment) => (
-                  <PaymentRow key={payment.id} payment={payment} onDelete={onDelete} />
-                ))}
-              </div>
               <Pagination
-                page={currentPage}
-                pageSize={pageSize}
-                total={list.length}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
+                page={currentJointPage}
+                pageSize={jointPageSize}
+                total={jointRenewals.length}
+                onPageChange={setJointPage}
+                onPageSizeChange={setJointPageSize}
               />
             </>
-          ) : null}
+          )}
         </>
       )}
 
