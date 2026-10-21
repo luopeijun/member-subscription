@@ -180,15 +180,17 @@ export function Compare({
               </div>
             ) : (
               <>
-                <div className="joint-quote-list">
-                  {jointPageItems.map((quote) => (
-                    <JointQuoteCard
-                      key={quote.id}
-                      quote={quote}
-                      onEdit={onEditJointQuote}
-                      onDelete={onDeleteJointQuote}
-                    />
-                  ))}
+                <div className="card card-pad">
+                  <div className="joint-quote-list">
+                    {jointPageItems.map((quote) => (
+                      <JointQuoteCard
+                        key={quote.id}
+                        quote={quote}
+                        onEdit={onEditJointQuote}
+                        onDelete={onDeleteJointQuote}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <Pagination
                   page={currentJointPage}
