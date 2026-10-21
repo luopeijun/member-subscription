@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { AppState, JointQuote, Plan, Snapshot } from '@/types'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import { SearchBox } from '@/components/SearchBox/SearchBox'
+import { buildMemberJointQuoteEntries } from '@/utils/jointQuote'
 import { groupPlansByService } from '@/utils/plan'
 import { searchSnapshots } from '@/utils/snapshot'
 import { ComparePlan } from './ComparePlan'
@@ -43,6 +44,11 @@ export function Compare({
   const history = useMemo(
     () => searchSnapshots(state.snapshots, keyword),
     [state.snapshots, keyword],
+  )
+
+  const jointQuoteEntries = useMemo(
+    () => buildMemberJointQuoteEntries(state.jointQuotes),
+    [state.jointQuotes],
   )
 
   return (
@@ -144,6 +150,7 @@ export function Compare({
                   plan={plan}
                   subscriptions={state.subscriptions}
                   snapshots={state.snapshots}
+                  jointQuoteEntries={jointQuoteEntries}
                   onSnapshot={onSnapshot}
                   onDeletePlan={onDeletePlan}
                   onDeleteSnapshot={onDeleteSnapshot}

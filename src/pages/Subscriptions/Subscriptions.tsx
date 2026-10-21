@@ -4,7 +4,6 @@ import { CATEGORIES } from '@/constants'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
 import { SearchBox } from '@/components/SearchBox/SearchBox'
 import { SelectMenu } from '@/components/SelectMenu/SelectMenu'
-import { buildMemberJointQuoteEntries } from '@/utils/jointQuote'
 import { sortSubscriptions, subscriptionMatchesQuery } from '@/utils/subscription'
 import { SubscriptionCard } from './SubscriptionCard'
 import './Subscriptions.scss'
@@ -77,11 +76,6 @@ export function Subscriptions({
 
     return [...filtered].sort(sortSubscriptions)
   }, [categoryScoped, filter, keyword])
-
-  const jointQuoteEntries = useMemo(
-    () => buildMemberJointQuoteEntries(state.jointQuotes),
-    [state.jointQuotes],
-  )
 
   const hasFilter = filter !== 'all' || category !== 'all'
   const clearFilters = () => {
@@ -183,7 +177,6 @@ export function Subscriptions({
             <SubscriptionCard
               key={sub.id}
               subscription={sub}
-              jointQuoteEntries={jointQuoteEntries.get(sub.id) ?? []}
               onEdit={onEdit}
               onRenew={onRenew}
               onDelete={onDelete}

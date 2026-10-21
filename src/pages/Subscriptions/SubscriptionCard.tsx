@@ -1,15 +1,12 @@
 import type { Subscription } from '@/types'
-import type { MemberJointQuoteEntry } from '@/utils/jointQuote'
 import { formatCNY } from '@shared/money'
 import { DaysBadge, StatusBadge } from '@/components/Badge/Badge'
 import { cycleLabel } from '@/utils/cycle'
 import { formatDate } from '@/utils/format'
-import { SubscriptionJointQuote } from './SubscriptionJointQuote'
 import './SubscriptionCard.scss'
 
 type SubscriptionCardProps = {
   subscription: Subscription
-  jointQuoteEntries: MemberJointQuoteEntry[]
   onEdit: (subscription: Subscription) => void
   onRenew: (subscription: Subscription) => void
   onDelete: (subscription: Subscription) => void
@@ -17,7 +14,6 @@ type SubscriptionCardProps = {
 
 export function SubscriptionCard({
   subscription: sub,
-  jointQuoteEntries,
   onEdit,
   onRenew,
   onDelete,
@@ -83,8 +79,6 @@ export function SubscriptionCard({
             : ''}
         </div>
       ) : null}
-
-      <SubscriptionJointQuote entries={jointQuoteEntries} />
 
       <div className="sub-renewal">
         {sub.nextRenewalAt ? (

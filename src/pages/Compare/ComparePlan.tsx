@@ -1,15 +1,18 @@
 import type { Plan, Snapshot, Subscription } from '@/types'
+import type { MemberJointQuoteEntry } from '@/utils/jointQuote'
 import { formatCNY } from '@shared/money'
 import { cycleLabel, cycleMonthly } from '@/utils/cycle'
 import { formatDay } from '@/utils/format'
 import { latestPerPlatform, snapshotMonthly } from '@/utils/snapshot'
 import { OfferRow } from './OfferRow'
+import { PlanJointQuote } from './PlanJointQuote'
 import './ComparePlan.scss'
 
 type ComparePlanProps = {
   plan: Plan
   subscriptions: Subscription[]
   snapshots: Snapshot[]
+  jointQuoteEntries: Map<number, MemberJointQuoteEntry[]>
   onSnapshot: (plan: Plan) => void
   onDeletePlan: (plan: Plan) => void
   onDeleteSnapshot: (snapshot: Snapshot) => void
@@ -20,6 +23,7 @@ export function ComparePlan({
   plan,
   subscriptions,
   snapshots,
+  jointQuoteEntries,
   onSnapshot,
   onDeletePlan,
   onDeleteSnapshot,
@@ -28,6 +32,7 @@ export function ComparePlan({
   const mySub = subscriptions.find(
     (sub) => sub.planId === plan.id && sub.status === 'active',
   )
+  const memberJointQuotes = mySub ? (jointQuoteEntries.get(mySub.id) ?? []) : []
   const myMonthly = mySub?.lastPayment
     ? cycleMonthly(plan.cycleMonths, plan.cycleDays, mySub.lastPayment.amount)
     : null
@@ -81,6 +86,10 @@ export function ComparePlan({
       ) : (
         <div className="my-purchase empty-my">当前未购买该套餐，以下为已录入的平台报价。</div>
       )}
+
+      {memberJointQuotes.length > 0 ? (
+        <PlanJointQuote entries={memberJointQuotes} />
+      ) : null}
 
       {offers.length === 0 ? (
         <p className="offer-empty muted">

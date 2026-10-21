@@ -2,9 +2,9 @@ import { useState } from 'react'
 import type { MemberJointQuoteEntry } from '@/utils/jointQuote'
 import { formatCNY } from '@shared/money'
 import { formatDay } from '@/utils/format'
-import './SubscriptionJointQuote.scss'
+import './PlanJointQuote.scss'
 
-type SubscriptionJointQuoteProps = {
+type PlanJointQuoteProps = {
   entries: MemberJointQuoteEntry[]
 }
 
@@ -13,14 +13,14 @@ function JointQuoteEntry({ entry }: { entry: MemberJointQuoteEntry }) {
   const currentMonthly = item.monthly
 
   return (
-    <div className="sub-joint-entry">
-      <div className="sub-joint-meta">
+    <div className="plan-joint-entry">
+      <div className="plan-joint-meta">
         <strong>{quote.platform ?? '未标注'}</strong>
         <span>{formatDay(quote.capturedAt)}</span>
         <span>整包 {formatCNY(quote.total)}</span>
       </div>
 
-      <div className="sub-joint-metrics">
+      <div className="plan-joint-metrics">
         <div>
           <span>分摊后</span>
           <strong>
@@ -47,13 +47,13 @@ function JointQuoteEntry({ entry }: { entry: MemberJointQuoteEntry }) {
         </div>
       </div>
 
-      <div className="sub-joint-companions">
-        <span className="sub-joint-companions-label">同捆</span>
+      <div className="plan-joint-companions">
+        <span className="plan-joint-companions-label">同捆套餐</span>
         {companions.length === 0 ? (
           <span className="muted">无其他会员</span>
         ) : (
           companions.map((companion) => (
-            <span className="sub-joint-companion" key={companion.subscriptionId}>
+            <span className="plan-joint-companion" key={companion.subscriptionId}>
               {companion.serviceName} · {companion.planName}
             </span>
           ))
@@ -63,7 +63,7 @@ function JointQuoteEntry({ entry }: { entry: MemberJointQuoteEntry }) {
   )
 }
 
-export function SubscriptionJointQuote({ entries }: SubscriptionJointQuoteProps) {
+export function PlanJointQuote({ entries }: PlanJointQuoteProps) {
   const [expanded, setExpanded] = useState(false)
 
   if (entries.length === 0) return null
@@ -71,14 +71,14 @@ export function SubscriptionJointQuote({ entries }: SubscriptionJointQuoteProps)
   const visibleEntries = expanded ? entries : entries.slice(0, 1)
 
   return (
-    <section className="sub-joint">
-      <div className="sub-joint-head">
-        <span className="sub-joint-title">联合报价</span>
-        <span className="sub-joint-hint">按分摊后等效金额从省到贵</span>
+    <section className="plan-joint">
+      <div className="plan-joint-head">
+        <span className="plan-joint-title">联合报价</span>
+        <span className="plan-joint-hint">按分摊后等效金额从省到贵</span>
         {entries.length > 1 ? (
           <button
             type="button"
-            className="btn sm sub-joint-toggle"
+            className="btn sm plan-joint-toggle"
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
           >
@@ -87,7 +87,7 @@ export function SubscriptionJointQuote({ entries }: SubscriptionJointQuoteProps)
         ) : null}
       </div>
 
-      <div className="sub-joint-list">
+      <div className="plan-joint-list">
         {visibleEntries.map((entry) => (
           <JointQuoteEntry
             key={`${entry.quote.id}-${entry.item.subscriptionId}`}
