@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { AppState, JointRenewal, Payment } from '@/types'
 import { formatCNY } from '@shared/money'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { FlowTabs } from '@/components/FlowTabs/FlowTabs'
 import { Pagination } from '@/components/Pagination/Pagination'
 import { SearchBox } from '@/components/SearchBox/SearchBox'
 import { JointRenewalCard } from './JointRenewalCard'
@@ -232,28 +233,15 @@ export function Payments({ state, onDelete, onDeleteJointRenewal }: PaymentsProp
         </div>
       ) : (
         <>
-          <div className="flow-tabs" role="tablist" aria-label="流水类型">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={flowTab === 'payments'}
-              className={`flow-tab${flowTab === 'payments' ? ' active' : ''}`}
-              onClick={() => setFlowTab('payments')}
-            >
-              普通续费
-              <span>{list.length}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={flowTab === 'joint'}
-              className={`flow-tab${flowTab === 'joint' ? ' active' : ''}`}
-              onClick={() => setFlowTab('joint')}
-            >
-              联合续费
-              <span>{jointRenewals.length}</span>
-            </button>
-          </div>
+          <FlowTabs
+            value={flowTab}
+            onChange={setFlowTab}
+            ariaLabel="流水类型"
+            tabs={[
+              { value: 'payments', label: '普通续费', count: list.length },
+              { value: 'joint', label: '联合续费', count: jointRenewals.length },
+            ]}
+          />
 
           {flowTab === 'payments' ? (
             list.length === 0 ? (

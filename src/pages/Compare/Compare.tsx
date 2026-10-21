@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { AppState, JointQuote, Plan, Snapshot } from '@/types'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { FlowTabs } from '@/components/FlowTabs/FlowTabs'
+import { Pagination } from '@/components/Pagination/Pagination'
 import { SearchBox } from '@/components/SearchBox/SearchBox'
 import { buildMemberJointQuoteEntries } from '@/utils/jointQuote'
 import { groupPlansByService } from '@/utils/plan'
-import { searchSnapshots } from '@/utils/snapshot'
 import { ComparePlan } from './ComparePlan'
 import { JointQuoteCard } from './JointQuoteCard'
-import { SnapshotHistory } from './SnapshotHistory'
 import './Compare.scss'
 
 type CompareProps = {
@@ -22,6 +22,21 @@ type CompareProps = {
   onDeleteJointQuote: (jointQuote: JointQuote) => void
 }
 
+type CompareTab = 'joint' | 'members'
+
+function jointQuoteMatches(quote: JointQuote, keyword: string): boolean {
+  if (!keyword) return true
+  const haystack = [
+    quote.platform,
+    quote.note,
+    ...quote.items.map((item) => item.serviceName),
+    ...quote.items.map((item) => item.planName),
+  ]
+  return haystack.some(
+    (value) => Boolean(value && value.toLowerCase().includes(keyword)),
+  )
+}
+
 export function Compare({
   state,
   onNewQuote,
@@ -34,6 +49,11 @@ export function Compare({
   onDeleteJointQuote,
 }: CompareProps) {
   const [query, setQuery] = useState('')
+  const [compareTab, setCompareTab] = useState<CompareTab>('joint')
+  const [jointPage, setJointPage] = useState(1)
+  const [jointPageSize, setJointPageSize] = useState(10)
+  const [memberPage, setMemberPage] = useState(1)
+  const [memberPageSize, setMemberPageSize] = useState(10)
   const keyword = query.trim().toLowerCase()
 
   const groups = useMemo(
@@ -41,15 +61,39 @@ export function Compare({
     [state.plans, keyword],
   )
 
-  const history = useMemo(
-    () => searchSnapshots(state.snapshots, keyword),
-    [state.snapshots, keyword],
+  const jointQuotes = useMemo(
+    () => state.jointQuotes.filter((quote) => jointQuoteMatches(quote, keyword)),
+    [state.jointQuotes, keyword],
   )
 
   const jointQuoteEntries = useMemo(
     () => buildMemberJointQuoteEntries(state.jointQuotes),
     [state.jointQuotes],
   )
+
+  const jointTotalPages = Math.max(1, Math.ceil(jointQuotes.length / jointPageSize))
+  const currentJointPage = Math.min(jointPage, jointTotalPages)
+  const jointPageItems = jointQuotes.slice(
+    (currentJointPage - 1) * jointPageSize,
+    currentJointPage * jointPageSize,
+  )
+
+  const memberTotalPages = Math.max(1, Math.ceil(groups.length / memberPageSize))
+  const currentMemberPage = Math.min(memberPage, memberTotalPages)
+  const memberPageItems = groups.slice(
+    (currentMemberPage - 1) * memberPageSize,
+    currentMemberPage * memberPageSize,
+  )
+
+  const changeQuery = (value: string) => {
+    setQuery(value)
+    setJointPage(1)
+    setMemberPage(1)
+  }
+
+  const clearSearch = () => changeQuery('')
+  const hasFilters = Boolean(keyword)
+  const hasAnything = state.plans.length > 0 || state.jointQuotes.length > 0
 
   return (
     <div className="stack">
@@ -67,7 +111,7 @@ export function Compare({
           </span>
         </div>
         <div className="toolbar-right">
-          <SearchBox value={query} onChange={setQuery} placeholder="搜索会员名称" />
+          <SearchBox value={query} onChange={changeQuery} placeholder="搜索会员名称" />
           <button className="btn" onClick={onAddJointQuote}>
             记录联合报价
           </button>
@@ -87,86 +131,136 @@ export function Compare({
         再与捆绑包总价对比。
       </p>
 
-      {state.jointQuotes.length > 0 ? (
-        <section className="card card-pad">
-          <div className="card-head">
-            <div>
-              <h2>联合报价</h2>
-              <p>一次购买多个会员的捆绑总价，与相同服务时长下的当前组合成本对比</p>
-            </div>
-          </div>
-          <div className="joint-quote-list">
-            {state.jointQuotes.map((quote) => (
-              <JointQuoteCard
-                key={quote.id}
-                quote={quote}
-                onEdit={onEditJointQuote}
-                onDelete={onDeleteJointQuote}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {groups.length === 0 ? (
+      {!hasAnything ? (
         <div className="card card-pad">
-          {keyword ? (
-            <EmptyState
-              title="没有找到匹配的套餐"
-              description={`会员名称里没有包含「${query.trim()}」的套餐。`}
-              action={
-                <button className="btn" onClick={() => setQuery('')}>
-                  清除搜索
-                </button>
-              }
-            />
-          ) : (
-            <EmptyState
-              title="还没有可比较的套餐"
-              description="点击「记录平台报价」录入同一服务的不同套餐或价格档位，保存后可对比不同平台的等效月成本。"
-              action={
-                <button className="btn primary" onClick={onNewQuote}>
-                  记录平台报价
-                </button>
-              }
-            />
-          )}
+          <EmptyState
+            title="还没有可比较的套餐"
+            description="点击「记录平台报价」录入同一服务的不同套餐或价格档位，保存后可对比不同平台的等效月成本。"
+            action={
+              <button className="btn primary" onClick={onNewQuote}>
+                记录平台报价
+              </button>
+            }
+          />
         </div>
       ) : (
-        groups.map((group) => (
-          <section className="card compare-card" key={group.serviceName}>
-            <div className="group-head">
-              <div>
-                <h2>{group.serviceName}</h2>
-                <p>
-                  {group.category} · {group.plans.length} 个套餐
-                </p>
-              </div>
-            </div>
-            <div className="plan-list">
-              {group.plans.map((plan) => (
-                <ComparePlan
-                  key={plan.id}
-                  plan={plan}
-                  subscriptions={state.subscriptions}
-                  snapshots={state.snapshots}
-                  jointQuoteEntries={jointQuoteEntries}
-                  onSnapshot={onSnapshot}
-                  onDeletePlan={onDeletePlan}
-                  onDeleteSnapshot={onDeleteSnapshot}
-                  onEditSnapshot={onEditSnapshot}
-                />
-              ))}
-            </div>
-          </section>
-        ))
-      )}
+        <>
+          <FlowTabs
+            value={compareTab}
+            onChange={setCompareTab}
+            ariaLabel="比价类型"
+            tabs={[
+              { value: 'joint', label: '联合报价', count: jointQuotes.length },
+              { value: 'members', label: '会员', count: groups.length },
+            ]}
+          />
 
-      <SnapshotHistory
-        snapshots={history}
-        onEdit={onEditSnapshot}
-        onDelete={onDeleteSnapshot}
-      />
+          {compareTab === 'joint' ? (
+            jointQuotes.length === 0 ? (
+              <div className="card card-pad">
+                <EmptyState
+                  title={hasFilters ? '没有找到联合报价' : '还没有联合报价'}
+                  description={
+                    hasFilters
+                      ? `联合报价里没有包含「${query.trim()}」的会员、套餐或平台。`
+                      : '一次购买多个会员时，可以记录联合报价，按分摊后的等效月成本对比。'
+                  }
+                  action={
+                    hasFilters ? (
+                      <button className="btn" onClick={clearSearch}>
+                        清除搜索
+                      </button>
+                    ) : (
+                      <button className="btn primary" onClick={onAddJointQuote}>
+                        记录联合报价
+                      </button>
+                    )
+                  }
+                />
+              </div>
+            ) : (
+              <>
+                <div className="joint-quote-list">
+                  {jointPageItems.map((quote) => (
+                    <JointQuoteCard
+                      key={quote.id}
+                      quote={quote}
+                      onEdit={onEditJointQuote}
+                      onDelete={onDeleteJointQuote}
+                    />
+                  ))}
+                </div>
+                <Pagination
+                  page={currentJointPage}
+                  pageSize={jointPageSize}
+                  total={jointQuotes.length}
+                  onPageChange={setJointPage}
+                  onPageSizeChange={setJointPageSize}
+                />
+              </>
+            )
+          ) : groups.length === 0 ? (
+            <div className="card card-pad">
+              <EmptyState
+                title={hasFilters ? '没有找到匹配的会员' : '还没有可比较的会员'}
+                description={
+                  hasFilters
+                    ? `会员名称或套餐名称里没有包含「${query.trim()}」。`
+                    : '点击「记录平台报价」录入套餐后，这里会显示每个会员的比价。'
+                }
+                action={
+                  hasFilters ? (
+                    <button className="btn" onClick={clearSearch}>
+                      清除搜索
+                    </button>
+                  ) : (
+                    <button className="btn primary" onClick={onNewQuote}>
+                      记录平台报价
+                    </button>
+                  )
+                }
+              />
+            </div>
+          ) : (
+            <>
+              {memberPageItems.map((group) => (
+                <section className="card compare-card" key={group.serviceName}>
+                  <div className="group-head">
+                    <div>
+                      <h2>{group.serviceName}</h2>
+                      <p>
+                        {group.category} · {group.plans.length} 个套餐
+                      </p>
+                    </div>
+                  </div>
+                  <div className="plan-list">
+                    {group.plans.map((plan) => (
+                      <ComparePlan
+                        key={plan.id}
+                        plan={plan}
+                        subscriptions={state.subscriptions}
+                        snapshots={state.snapshots}
+                        jointQuoteEntries={jointQuoteEntries}
+                        onSnapshot={onSnapshot}
+                        onDeletePlan={onDeletePlan}
+                        onDeleteSnapshot={onDeleteSnapshot}
+                        onEditSnapshot={onEditSnapshot}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+              <Pagination
+                page={currentMemberPage}
+                pageSize={memberPageSize}
+                total={groups.length}
+                onPageChange={setMemberPage}
+                onPageSizeChange={setMemberPageSize}
+              />
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }

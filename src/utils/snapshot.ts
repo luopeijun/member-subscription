@@ -43,12 +43,3 @@ export function latestPerPlatform(snapshots: Snapshot[], planId: number): Snapsh
   }
   return [...map.values()].sort((a, b) => a.price - b.price)
 }
-
-export function searchSnapshots(snapshots: Snapshot[], keyword: string): Snapshot[] {
-  if (!keyword) return snapshots
-  return snapshots.filter(
-    (snapshot) =>
-      snapshot.serviceName.toLowerCase().includes(keyword) ||
-      snapshot.planName.toLowerCase().includes(keyword),
-  )
-}
