@@ -2,14 +2,26 @@ import { Router, type Request, type Response } from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import { db, dbPath } from './db'
+import { DAYS_PER_MONTH } from '../shared/duration'
 import { HttpError } from './errors'
-import { buildState } from './store'
 import { seedDemoData } from './seed'
-import { addDays, addMonths, isISODate, nowISO, todayISO } from './util'
-import { DAYS_PER_MONTH, MAX_DURATION_DAYS } from '../shared/duration'
+import { buildState } from './store'
 import { exportAll, importAll } from './transfer'
-
-const STATUSES = new Set(['active', 'expired', 'planned'])
+import { addDays, addMonths, nowISO, todayISO } from './util'
+import {
+  costMode,
+  date,
+  idParam,
+  integer,
+  maybeDate,
+  optionalText,
+  parseCycle,
+  parseMembers,
+  readQuote,
+  status,
+  text,
+} from './validation'
+import type { JointMemberInput, QuoteInput } from './validation'
 
 function route(handler: (req: Request, res: Response) => void) {
   return (req: Request, res: Response) => {
@@ -21,124 +33,6 @@ function route(handler: (req: Request, res: Response) => void) {
       if (status >= 500) console.error(error)
       res.status(status).json({ error: message })
     }
-  }
-}
-
-function text(value: unknown, label: string, max = 120): string {
-  if (typeof value !== 'string' || !value.trim()) {
-    throw new HttpError(400, `请填写${label}`)
-  }
-  return value.trim().slice(0, max)
-}
-
-function optionalText(value: unknown, max = 300): string | null {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim().slice(0, max)
-  return trimmed || null
-}
-
-function integer(
-  value: unknown,
-  label: string,
-  min = Number.MIN_SAFE_INTEGER,
-  max = Number.MAX_SAFE_INTEGER,
-): number {
-  const parsed = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
-    throw new HttpError(400, `${label}必须是整数`)
-  }
-  if (parsed < min || parsed > max) {
-    throw new HttpError(400, `${label}超出允许范围`)
-  }
-  return parsed
-}
-
-function date(value: unknown, label: string): string {
-  if (!isISODate(value)) {
-    throw new HttpError(400, `${label}格式应为 YYYY-MM-DD`)
-  }
-  const [year, month, day] = value.split('-').map(Number)
-  const parsed = new Date(Date.UTC(year, month - 1, day))
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
-    throw new HttpError(400, `${label}不是有效日期`)
-  }
-  return value
-}
-
-function maybeDate(value: unknown, label: string): string | null {
-  if (value === null || value === undefined || value === '') return null
-  return date(value, label)
-}
-
-function status(value: unknown): string {
-  if (typeof value !== 'string' || !STATUSES.has(value)) {
-    throw new HttpError(400, '状态不正确')
-  }
-  return value
-}
-
-const CYCLE_MONTHS = new Set([-1, 0, 1, 3, 6, 12, 24])
-
-function cycle(value: unknown): number {
-  const months = integer(value, '周期', -1, 120)
-  if (!CYCLE_MONTHS.has(months)) {
-    throw new HttpError(400, '计费周期只能是 1 天、1 周、月付、季付、半年付、年付、2 年、一次性付费或买断')
-  }
-  return months
-}
-
-function cycleDays(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null
-  return integer(value, '周期天数', 1, 3650)
-}
-
-function quoteDurationDays(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null
-  return integer(value, '套餐总时长（天）', 1, MAX_DURATION_DAYS)
-}
-
-type Cycle = {
-  cycleMonths: number
-  cycleDays: number | null
-}
-
-function parseCycle(body: Record<string, unknown>, fallback: Cycle): Cycle {
-  // 明确传了天数就以天数为准；传 null / 空字符串表示改回月周期。
-  if (body.cycleDays !== undefined) {
-    const days = cycleDays(body.cycleDays)
-    if (days !== null) return { cycleMonths: 0, cycleDays: days }
-  }
-  if (body.cycleMonths !== undefined) {
-    return { cycleMonths: cycle(body.cycleMonths), cycleDays: null }
-  }
-  const fallbackDays = cycleDays(fallback.cycleDays)
-  if (fallbackDays !== null) return { cycleMonths: 0, cycleDays: fallbackDays }
-  return { cycleMonths: cycle(fallback.cycleMonths), cycleDays: null }
-}
-
-type QuoteInput = {
-  capturedAt: string
-  durationDays: number | null
-  price: number
-  cycleMonths: number
-  cycleDays: number | null
-  platform: string
-  note: string | null
-}
-
-function readQuote(body: Record<string, unknown>, fallback: Cycle): QuoteInput {
-  const capturedAt = date(body.capturedAt, '记录日期')
-  return {
-    capturedAt,
-    durationDays: quoteDurationDays(body.durationDays),
-    price: integer(body.price, '价格', 0, 1_000_000_000_000),
-    ...parseCycle(body, fallback),
-    platform: text(body.platform, '平台', 60),
-    note: optionalText(body.note, 300),
   }
 }
 
@@ -158,14 +52,6 @@ function insertPriceSnapshot(planId: number, quote: QuoteInput) {
     quote.note,
     nowISO(),
   )
-}
-
-function idParam(value: string, label: string): number {
-  const parsed = Number(value)
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new HttpError(400, `${label}不存在`)
-  }
-  return parsed
 }
 
 function upsertService(name: string, category: string): number {
@@ -344,34 +230,6 @@ function insertPayment(
   }
 
   return { id: Number(info.lastInsertRowid), amount, durationDays, nextDate }
-}
-
-type JointCostMode = 'split' | 'main'
-
-function costMode(value: unknown): JointCostMode {
-  if (value === 'split' || value === 'main') return value
-  throw new HttpError(400, '费用归属不正确')
-}
-
-type JointMemberInput = {
-  subscriptionId: number
-  days: number
-}
-
-function parseMembers(value: unknown, label: string): JointMemberInput[] {
-  if (!Array.isArray(value)) {
-    throw new HttpError(400, `${label}格式不正确`)
-  }
-  const seen = new Set<number>()
-  const members: JointMemberInput[] = []
-  for (const raw of value as Record<string, unknown>[]) {
-    const subscriptionId = integer(raw.subscriptionId, label, 1)
-    if (seen.has(subscriptionId)) continue
-    seen.add(subscriptionId)
-    const days = integer(raw.durationDays, `${label}时长（天）`, 1, 3650)
-    members.push({ subscriptionId, days })
-  }
-  return members
 }
 
 export const apiRouter = Router()
