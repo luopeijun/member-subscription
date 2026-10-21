@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { AppState, Subscription } from '@/types'
 import { CATEGORIES } from '@/constants'
 import { EmptyState } from '@/components/EmptyState/EmptyState'
+import { Pagination } from '@/components/Pagination/Pagination'
 import { SearchBox } from '@/components/SearchBox/SearchBox'
 import { SelectMenu } from '@/components/SelectMenu/SelectMenu'
 import { sortSubscriptions, subscriptionMatchesQuery } from '@/utils/subscription'
@@ -37,8 +38,10 @@ export function Subscriptions({
   const [filter, setFilter] = useState<Filter>('all')
   const [category, setCategory] = useState('all')
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
 
   const keyword = query.trim().toLowerCase()
+  const PAGE_SIZE = 9
 
   const categoryOptions = useMemo(() => {
     const counts = new Map<string, number>()
@@ -77,11 +80,34 @@ export function Subscriptions({
     return [...filtered].sort(sortSubscriptions)
   }, [categoryScoped, filter, keyword])
 
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = list.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  )
+
+  const changeFilter = (value: Filter) => {
+    setFilter(value)
+    setPage(1)
+  }
+
+  const changeCategory = (value: string) => {
+    setCategory(value)
+    setPage(1)
+  }
+
+  const changeQuery = (value: string) => {
+    setQuery(value)
+    setPage(1)
+  }
+
   const hasFilter = filter !== 'all' || category !== 'all'
   const clearFilters = () => {
     setFilter('all')
     setCategory('all')
     setQuery('')
+    setPage(1)
   }
 
   return (
@@ -97,7 +123,7 @@ export function Subscriptions({
               <button
                 key={item.value}
                 className={`chip ${filter === item.value ? 'active' : ''}`}
-                onClick={() => setFilter(item.value)}
+                onClick={() => changeFilter(item.value)}
               >
                 {item.label}
                 <span>{count}</span>
@@ -108,7 +134,7 @@ export function Subscriptions({
         <div className="toolbar-right">
           <SelectMenu
             value={category}
-            onChange={setCategory}
+            onChange={changeCategory}
             ariaLabel="按类别筛选"
             options={[
               {
@@ -125,7 +151,7 @@ export function Subscriptions({
           />
           <SearchBox
             value={query}
-            onChange={setQuery}
+            onChange={changeQuery}
             placeholder="搜索会员名称或备注"
           />
           <button className="btn" onClick={onJointRenew}>
@@ -172,17 +198,26 @@ export function Subscriptions({
           />
         </div>
       ) : (
-        <div className="sub-grid">
-          {list.map((sub) => (
-            <SubscriptionCard
-              key={sub.id}
-              subscription={sub}
-              onEdit={onEdit}
-              onRenew={onRenew}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
+        <>
+          <div className="sub-grid">
+            {pageItems.map((sub) => (
+              <SubscriptionCard
+                key={sub.id}
+                subscription={sub}
+                onEdit={onEdit}
+                onRenew={onRenew}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+          <Pagination
+            page={currentPage}
+            pageSize={PAGE_SIZE}
+            total={list.length}
+            onPageChange={setPage}
+            showPageSize={false}
+          />
+        </>
       )}
     </div>
   )

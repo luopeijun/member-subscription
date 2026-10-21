@@ -6,8 +6,9 @@ type PaginationProps = {
   pageSize: number
   total: number
   onPageChange: (page: number) => void
-  onPageSizeChange: (pageSize: number) => void
+  onPageSizeChange?: (pageSize: number) => void
   pageSizeOptions?: number[]
+  showPageSize?: boolean
 }
 
 export function Pagination({
@@ -17,6 +18,7 @@ export function Pagination({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [5, 10, 20, 50],
+  showPageSize = true,
 }: PaginationProps) {
   if (total === 0) return null
 
@@ -24,6 +26,7 @@ export function Pagination({
   const current = Math.min(Math.max(1, page), totalPages)
 
   const changeSize = (value: number) => {
+    if (!onPageSizeChange) return
     onPageSizeChange(value)
     onPageChange(1)
   }
@@ -34,19 +37,21 @@ export function Pagination({
         <span className="pager-info">
           共 <strong>{total}</strong> 条
         </span>
-        <span className="pager-size">
-          每页
-          <SelectMenu
-            value={String(pageSize)}
-            onChange={(value) => changeSize(Number(value))}
-            ariaLabel="每页条数"
-            size="sm"
-            options={pageSizeOptions.map((size) => ({
-              value: String(size),
-              label: `${size} 条`,
-            }))}
-          />
-        </span>
+        {showPageSize && onPageSizeChange ? (
+          <span className="pager-size">
+            每页
+            <SelectMenu
+              value={String(pageSize)}
+              onChange={(value) => changeSize(Number(value))}
+              ariaLabel="每页条数"
+              size="sm"
+              options={pageSizeOptions.map((size) => ({
+                value: String(size),
+                label: `${size} 条`,
+              }))}
+            />
+          </span>
+        ) : null}
       </div>
       <div className="pager-right">
         <button className="pager-btn" onClick={() => onPageChange(1)} disabled={current === 1}>
