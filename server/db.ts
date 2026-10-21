@@ -4,10 +4,15 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const projectRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const dataDir = path.join(projectRoot, 'data')
-fs.mkdirSync(dataDir, { recursive: true })
+const defaultDbPath = path.join(projectRoot, 'data', 'app.db')
+// 测试通过 SUBLEDGER_DB_PATH 指向临时数据库，避免读写真实数据。
+const configuredDbPath = process.env.SUBLEDGER_DB_PATH?.trim()
 
-export const dbPath = path.join(dataDir, 'app.db')
+export const dbPath = configuredDbPath
+  ? path.resolve(configuredDbPath)
+  : defaultDbPath
+
+fs.mkdirSync(path.dirname(dbPath), { recursive: true })
 
 export const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
