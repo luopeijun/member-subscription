@@ -414,7 +414,11 @@ export default function App() {
             onSnapshot={(plan) => setModal({ kind: 'quote', plan })}
             onDeletePlan={handleDeletePlan}
             onDeleteSnapshot={handleDeleteSnapshot}
+            onEditSnapshot={(snapshot) => setModal({ kind: 'editQuote', snapshot })}
             onAddJointQuote={() => setModal({ kind: 'jointQuote' })}
+            onEditJointQuote={(jointQuote) =>
+              setModal({ kind: 'editJointQuote', jointQuote })
+            }
             onDeleteJointQuote={handleDeleteJointQuote}
           />
         ) : null}

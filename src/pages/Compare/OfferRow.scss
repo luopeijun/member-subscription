@@ -59,7 +59,9 @@
   white-space: nowrap;
 }
 
-.offer-delete {
+.offer-actions {
+  display: flex;
+  gap: 6px;
   justify-self: end;
 }
 
@@ -83,7 +85,7 @@
     white-space: normal;
   }
 
-  .offer-delete {
+  .offer-actions {
     grid-column: span 2;
     justify-self: start;
   }

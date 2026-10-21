@@ -13,6 +13,7 @@ type ComparePlanProps = {
   onSnapshot: (plan: Plan) => void
   onDeletePlan: (plan: Plan) => void
   onDeleteSnapshot: (snapshot: Snapshot) => void
+  onEditSnapshot: (snapshot: Snapshot) => void
 }
 
 export function ComparePlan({
@@ -22,6 +23,7 @@ export function ComparePlan({
   onSnapshot,
   onDeletePlan,
   onDeleteSnapshot,
+  onEditSnapshot,
 }: ComparePlanProps) {
   const mySub = subscriptions.find(
     (sub) => sub.planId === plan.id && sub.status === 'active',
@@ -103,6 +105,7 @@ export function ComparePlan({
               myMonthly={myMonthly}
               myPlatform={mySub?.platform ?? undefined}
               lowestMonthly={lowestMonthly}
+              onEdit={onEditSnapshot}
               onDelete={onDeleteSnapshot}
             />
           ))}

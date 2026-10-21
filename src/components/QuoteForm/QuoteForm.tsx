@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '@/api'
-import type { AppState, Plan, SavedHandler } from '@/types'
+import type { AppState, Plan, SavedHandler, Snapshot } from '@/types'
 import { CATEGORIES } from '@/constants'
 import { cycleLabel } from '@/utils/cycle'
 import {
@@ -19,24 +19,38 @@ import { toMajor } from '@shared/money'
 type QuoteFormProps = {
   state: AppState
   plan?: Plan
+  snapshot?: Snapshot
   onClose: () => void
   onSaved: SavedHandler
 }
 
-export function QuoteForm({ state, plan, onClose, onSaved }: QuoteFormProps) {
+export function QuoteForm({ state, plan, snapshot, onClose, onSaved }: QuoteFormProps) {
   const isNew = !plan
+  const isEdit = Boolean(snapshot)
   const [serviceName, setServiceName] = useState(plan?.serviceName ?? '')
   const [category, setCategory] = useState(plan?.category ?? '影音娱乐')
   const [planName, setPlanName] = useState(plan?.name ?? '')
-  const [quote, setQuote] = useState<QuoteDraft>(() => ({
-    ...createQuoteDraft(
-      state.today,
-      plan?.cycleMonths ?? 12,
-      plan?.cycleDays ?? null,
-    ),
-    price: plan?.listPrice ? String(toMajor(plan.listPrice)) : '',
-  }))
-  const [note, setNote] = useState('')
+  const [quote, setQuote] = useState<QuoteDraft>(() =>
+    snapshot
+      ? {
+          platform: snapshot.platform ?? '',
+          price: String(toMajor(snapshot.price)),
+          capturedAt: snapshot.capturedAt,
+          durationDays:
+            snapshot.durationDays === null ? '' : String(snapshot.durationDays),
+          cycleMonths: snapshot.cycleMonths,
+          cycleDays: snapshot.cycleDays,
+        }
+      : {
+          ...createQuoteDraft(
+            state.today,
+            plan?.cycleMonths ?? 12,
+            plan?.cycleDays ?? null,
+          ),
+          price: plan?.listPrice ? String(toMajor(plan.listPrice)) : '',
+        },
+  )
+  const [note, setNote] = useState(snapshot?.note ?? '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -68,25 +82,37 @@ export function QuoteForm({ state, plan, onClose, onSaved }: QuoteFormProps) {
     setBusy(true)
     try {
       const payload = quotePayload(quote, note.trim() || null)
-      const next = plan
-        ? await api<AppState>('/snapshots', {
-            method: 'POST',
-            body: JSON.stringify({ planId: plan.id, ...payload }),
+      const next = snapshot
+        ? await api<AppState>(`/snapshots/${snapshot.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
           })
-        : await api<AppState>('/plans', {
-            method: 'POST',
-            body: JSON.stringify({
-              serviceName: serviceName.trim(),
-              category,
-              planName: planName.trim(),
-              cycleMonths: quote.cycleMonths,
-              cycleDays: quote.cycleDays,
-              listPrice: payload.price,
-              note: note.trim() || null,
-              quote: payload,
-            }),
-          })
-      onSaved(next, plan ? '平台报价已记录' : '套餐和平台报价已添加')
+        : plan
+          ? await api<AppState>('/snapshots', {
+              method: 'POST',
+              body: JSON.stringify({ planId: plan.id, ...payload }),
+            })
+          : await api<AppState>('/plans', {
+              method: 'POST',
+              body: JSON.stringify({
+                serviceName: serviceName.trim(),
+                category,
+                planName: planName.trim(),
+                cycleMonths: quote.cycleMonths,
+                cycleDays: quote.cycleDays,
+                listPrice: payload.price,
+                note: note.trim() || null,
+                quote: payload,
+              }),
+            })
+      onSaved(
+        next,
+        snapshot
+          ? '平台报价已更新'
+          : plan
+            ? '平台报价已记录'
+            : '套餐和平台报价已添加',
+      )
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -96,7 +122,7 @@ export function QuoteForm({ state, plan, onClose, onSaved }: QuoteFormProps) {
 
   return (
     <Modal
-      title="记录平台报价"
+      title={isEdit ? '编辑平台报价' : '记录平台报价'}
       subtitle={
         plan
           ? `${plan.serviceName} · ${plan.name} · ${cycleLabel(plan.cycleMonths, plan.cycleDays)}`
@@ -107,7 +133,7 @@ export function QuoteForm({ state, plan, onClose, onSaved }: QuoteFormProps) {
       <form onSubmit={submit}>
         <FormSectionTitle
           title="套餐信息"
-          hint={plan ? '已选套餐' : '新套餐，保存后自动创建'}
+          hint={isEdit ? '编辑时不可修改套餐' : plan ? '已选套餐' : '新套餐，保存后自动创建'}
         />
         <div className="form-grid">
           <div className="field">
@@ -180,7 +206,13 @@ export function QuoteForm({ state, plan, onClose, onSaved }: QuoteFormProps) {
             取消
           </button>
           <button type="submit" className="btn primary" disabled={busy}>
-            {busy ? '保存中…' : plan ? '保存报价' : '保存并添加套餐'}
+            {busy
+              ? '保存中…'
+              : isEdit
+                ? '保存修改'
+                : plan
+                  ? '保存报价'
+                  : '保存并添加套餐'}
           </button>
         </div>
       </form>

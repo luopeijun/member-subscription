@@ -9,6 +9,7 @@ type OfferRowProps = {
   myMonthly: number | null
   myPlatform: string | undefined
   lowestMonthly: number | null
+  onEdit: (snapshot: Snapshot) => void
   onDelete: (snapshot: Snapshot) => void
 }
 
@@ -17,6 +18,7 @@ export function OfferRow({
   myMonthly,
   myPlatform,
   lowestMonthly,
+  onEdit,
   onDelete,
 }: OfferRowProps) {
   const monthly = snapshotMonthly(offer)
@@ -56,9 +58,14 @@ export function OfferRow({
       <span className="offer-date">{formatDay(offer.capturedAt)}</span>
       <span className="offer-duration">{snapshotDurationLabel(offer)}</span>
       <span className="offer-note">{offer.note ?? '—'}</span>
-      <button className="btn sm danger offer-delete" onClick={() => onDelete(offer)}>
-        删除
-      </button>
+      <span className="offer-actions">
+        <button className="btn sm" onClick={() => onEdit(offer)}>
+          编辑
+        </button>
+        <button className="btn sm danger" onClick={() => onDelete(offer)}>
+          删除
+        </button>
+      </span>
     </div>
   )
 }

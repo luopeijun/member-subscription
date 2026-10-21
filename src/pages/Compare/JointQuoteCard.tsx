@@ -6,10 +6,11 @@ import './JointQuoteCard.scss'
 
 type JointQuoteCardProps = {
   quote: JointQuote
+  onEdit: (jointQuote: JointQuote) => void
   onDelete: (jointQuote: JointQuote) => void
 }
 
-export function JointQuoteCard({ quote, onDelete }: JointQuoteCardProps) {
+export function JointQuoteCard({ quote, onEdit, onDelete }: JointQuoteCardProps) {
   const entries = quote.items.map((item) => {
     const currentCost =
       item.monthly !== null && item.durationDays > 0
@@ -36,9 +37,14 @@ export function JointQuoteCard({ quote, onDelete }: JointQuoteCardProps) {
             {mainName} · {quote.costMode === 'split' ? '均分' : '主会员承担'}
           </span>
         </div>
-        <button className="btn sm danger" onClick={() => onDelete(quote)}>
-          删除
-        </button>
+        <div className="row gap-6">
+          <button className="btn sm" onClick={() => onEdit(quote)}>
+            编辑
+          </button>
+          <button className="btn sm danger" onClick={() => onDelete(quote)}>
+            删除
+          </button>
+        </div>
       </div>
 
       <div className="joint-quote-items">

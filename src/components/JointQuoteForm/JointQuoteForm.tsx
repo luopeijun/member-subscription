@@ -1,10 +1,16 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '@/api'
-import type { AppState, JointCostMode, SavedHandler, Subscription } from '@/types'
+import type {
+  AppState,
+  JointCostMode,
+  JointQuote,
+  SavedHandler,
+  Subscription,
+} from '@/types'
 import { PLATFORM_SUGGESTIONS } from '@/constants'
 import { Modal } from '@/components/Modal/Modal'
 import { SelectMenu } from '@/components/SelectMenu/SelectMenu'
-import { formatCNY, toMinor } from '@shared/money'
+import { formatCNY, toMajor, toMinor } from '@shared/money'
 import { DAYS_PER_MONTH, DURATION_PRESETS } from '@shared/duration'
 import { clampDurationDays } from '@/utils/duration'
 import { monthlyEquivalent } from '@/utils/subscription'
@@ -14,6 +20,7 @@ import './JointQuoteForm.scss'
 
 type JointQuoteFormProps = {
   state: AppState
+  editing?: JointQuote
   onClose: () => void
   onSaved: SavedHandler
 }
@@ -23,16 +30,35 @@ type QuoteItemDraft = {
   days: number
 }
 
-export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps) {
-  const [items, setItems] = useState<QuoteItemDraft[]>([])
-  const [mainId, setMainId] = useState<number | null>(null)
+export function JointQuoteForm({
+  state,
+  editing,
+  onClose,
+  onSaved,
+}: JointQuoteFormProps) {
+  const isEdit = Boolean(editing)
+  const [items, setItems] = useState<QuoteItemDraft[]>(() =>
+    editing
+      ? editing.items.map((item) => ({
+          id: item.subscriptionId,
+          days: item.durationDays,
+        }))
+      : [],
+  )
+  const [mainId, setMainId] = useState<number | null>(
+    editing?.mainSubscriptionId ?? null,
+  )
   const [picker, setPicker] = useState('')
-  const [platform, setPlatform] = useState('')
-  const [total, setTotal] = useState('')
+  const [platform, setPlatform] = useState(editing?.platform ?? '')
+  const [total, setTotal] = useState(
+    editing ? String(toMajor(editing.total)) : '',
+  )
   const [defaultDays, setDefaultDays] = useState(365)
-  const [costMode, setCostMode] = useState<JointCostMode>('split')
-  const [capturedAt, setCapturedAt] = useState(state.today)
-  const [note, setNote] = useState('')
+  const [costMode, setCostMode] = useState<JointCostMode>(
+    editing?.costMode ?? 'split',
+  )
+  const [capturedAt, setCapturedAt] = useState(editing?.capturedAt ?? state.today)
+  const [note, setNote] = useState(editing?.note ?? '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -122,22 +148,30 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
 
     setBusy(true)
     try {
-      const next = await api<AppState>('/joint-quotes', {
-        method: 'POST',
-        body: JSON.stringify({
-          capturedAt,
-          total: totalFen,
-          mainSubscriptionId: mainId,
-          costMode,
-          platform: platform.trim(),
-          note: note.trim() || null,
-          items: selected.map((item) => ({
-            subscriptionId: item.id,
-            durationDays: item.days,
-          })),
-        }),
-      })
-      onSaved(next, '联合报价已记录')
+      const payload = {
+        capturedAt,
+        total: totalFen,
+        mainSubscriptionId: mainId,
+        costMode,
+        platform: platform.trim(),
+        note: note.trim() || null,
+      }
+      const next = editing
+        ? await api<AppState>(`/joint-quotes/${editing.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          })
+        : await api<AppState>('/joint-quotes', {
+            method: 'POST',
+            body: JSON.stringify({
+              ...payload,
+              items: selected.map((item) => ({
+                subscriptionId: item.id,
+                durationDays: item.days,
+              })),
+            }),
+          })
+      onSaved(next, editing ? '联合报价已更新' : '联合报价已记录')
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -147,41 +181,51 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
 
   return (
     <Modal
-      title="记录联合报价"
-      subtitle="一次购买多个会员的捆绑总价，与相同服务时长下的当前组合成本对比"
+      title={isEdit ? '编辑联合报价' : '记录联合报价'}
+      subtitle={
+        isEdit
+          ? '只能修改报价信息，参与会员、套餐和时长保持不变'
+          : '一次购买多个会员的捆绑总价，与相同服务时长下的当前组合成本对比'
+      }
       onClose={onClose}
     >
       <form onSubmit={submit}>
-        <div className="field">
-          <label>这条报价包含哪些会员</label>
-          <div className="joint-add-row">
-            <SelectMenu
-              value={picker}
-              options={options.map((sub) => ({
-                value: String(sub.id),
-                label: `${sub.serviceName} · ${sub.planName}`,
-              }))}
-              onChange={setPicker}
-              ariaLabel="选择要添加的会员"
-              searchable
-              searchPlaceholder="搜索会员"
-            />
-            <button
-              type="button"
-              className="btn"
-              onClick={addMember}
-              disabled={!picker}
-            >
-              添加
-            </button>
+        {!isEdit ? (
+          <div className="field">
+            <label>这条报价包含哪些会员</label>
+            <div className="joint-add-row">
+              <SelectMenu
+                value={picker}
+                options={options.map((sub) => ({
+                  value: String(sub.id),
+                  label: `${sub.serviceName} · ${sub.planName}`,
+                }))}
+                onChange={setPicker}
+                ariaLabel="选择要添加的会员"
+                searchable
+                searchPlaceholder="搜索会员"
+              />
+              <button
+                type="button"
+                className="btn"
+                onClick={addMember}
+                disabled={!picker}
+              >
+                添加
+              </button>
+            </div>
+            <p className="joint-hint">
+              选择当前持有的会员，并填写每个会员在这条报价中的服务时长，用于计算当前组合成本。
+            </p>
           </div>
+        ) : (
           <p className="joint-hint">
-            选择当前持有的会员，并填写每个会员在这条报价中的服务时长，用于计算当前组合成本。
+            编辑时只能调整平台、总价、费用归属、日期和备注；参与会员、套餐和时长不会改变。
           </p>
-        </div>
+        )}
 
         <div className="field" style={{ marginTop: 12 }}>
-          <label>已添加的会员</label>
+          <label>{isEdit ? '套餐会员与时长' : '已添加的会员'}</label>
           {selected.length === 0 ? (
             <p className="joint-hint">还没有添加会员。至少添加两个才能记录联合报价。</p>
           ) : (
@@ -204,6 +248,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
                       max={3650}
                       value={entry.days}
                       aria-label={`${entry.sub.serviceName} 时长（天）`}
+                      disabled={isEdit}
                       onChange={(event) =>
                         updateItem(entry.id, clampDurationDays(event.target.value))
                       }
@@ -216,13 +261,15 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
                       当前 {entry.currentCost === null ? '—' : formatCNY(entry.currentCost)}
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    className="btn sm"
-                    onClick={() => removeMember(entry.id)}
-                  >
-                    移除
-                  </button>
+                  {!isEdit ? (
+                    <button
+                      type="button"
+                      className="btn sm"
+                      onClick={() => removeMember(entry.id)}
+                    >
+                      移除
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -255,40 +302,44 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
               onChange={(event) => setTotal(event.target.value)}
             />
           </div>
-          <div className="field span-2">
-            <label>默认天数</label>
-            <div className="duration-input">
-              <input
-                type="number"
-                min={1}
-                max={3650}
-                value={defaultDays}
-                aria-label="默认天数"
-                onChange={(event) => setDefaultDays(clampDurationDays(event.target.value))}
-              />
-              <span>天</span>
-              <button
-                type="button"
-                className="btn sm"
-                onClick={applyDefault}
-                disabled={selected.length === 0}
-              >
-                应用到全部
-              </button>
-            </div>
-            <div className="duration-presets">
-              {DURATION_PRESETS.map((preset) => (
+          {!isEdit ? (
+            <div className="field span-2">
+              <label>默认天数</label>
+              <div className="duration-input">
+                <input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={defaultDays}
+                  aria-label="默认天数"
+                  onChange={(event) =>
+                    setDefaultDays(clampDurationDays(event.target.value))
+                  }
+                />
+                <span>天</span>
                 <button
-                  key={preset.days}
                   type="button"
-                  className={`btn sm${defaultDays === preset.days ? ' active' : ''}`}
-                  onClick={() => setDefaultDays(preset.days)}
+                  className="btn sm"
+                  onClick={applyDefault}
+                  disabled={selected.length === 0}
                 >
-                  {preset.label}
+                  应用到全部
                 </button>
-              ))}
+              </div>
+              <div className="duration-presets">
+                {DURATION_PRESETS.map((preset) => (
+                  <button
+                    key={preset.days}
+                    type="button"
+                    className={`btn sm${defaultDays === preset.days ? ' active' : ''}`}
+                    onClick={() => setDefaultDays(preset.days)}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
           <div className="field">
             <label>费用归属</label>
             <select
@@ -391,7 +442,7 @@ export function JointQuoteForm({ state, onClose, onSaved }: JointQuoteFormProps)
               busy || selected.length < 2 || mainId === null || !platform.trim()
             }
           >
-            {busy ? '保存中…' : '记录报价'}
+            {busy ? '保存中…' : isEdit ? '保存修改' : '记录报价'}
           </button>
         </div>
       </form>

@@ -773,6 +773,44 @@ apiRouter.post(
   }),
 )
 
+apiRouter.put(
+  '/snapshots/:id',
+  route((req, res) => {
+    const id = idParam(req.params.id, '比价记录')
+    const snapshot = db
+      .prepare(
+        'SELECT id, cycle_months, cycle_days FROM price_snapshots WHERE id = ?',
+      )
+      .get(id) as
+      | { id: number; cycle_months: number; cycle_days: number | null }
+      | undefined
+    if (!snapshot) throw new HttpError(404, '比价记录不存在')
+
+    // 报价挂在哪个套餐上是固定的，编辑只改报价信息。
+    const quote = readQuote(req.body ?? {}, {
+      cycleMonths: snapshot.cycle_months,
+      cycleDays: snapshot.cycle_days,
+    })
+    db.prepare(
+      `UPDATE price_snapshots
+       SET captured_at = ?, duration_days = ?, price = ?, cycle_months = ?,
+           cycle_days = ?, platform = ?, note = ?
+       WHERE id = ?`,
+    ).run(
+      quote.capturedAt,
+      quote.durationDays,
+      quote.price,
+      quote.cycleMonths,
+      quote.cycleDays,
+      quote.platform,
+      quote.note,
+      id,
+    )
+
+    res.json(buildState())
+  }),
+)
+
 apiRouter.delete(
   '/snapshots/:id',
   route((req, res) => {
@@ -845,6 +883,43 @@ apiRouter.post(
     })()
 
     res.status(201).json(buildState())
+  }),
+)
+
+apiRouter.put(
+  '/joint-quotes/:id',
+  route((req, res) => {
+    const id = idParam(req.params.id, '联合报价')
+    const quote = db
+      .prepare('SELECT id FROM joint_quotes WHERE id = ?')
+      .get(id) as { id: number } | undefined
+    if (!quote) throw new HttpError(404, '联合报价不存在')
+
+    const body = req.body ?? {}
+    const capturedAt = date(body.capturedAt, '记录日期')
+    const total = integer(body.total, '整条报价', 0, 1_000_000_000_000)
+    const mode = costMode(body.costMode)
+    const platform = text(body.platform, '平台', 60)
+    const note = optionalText(body.note, 300)
+    const mainSubscriptionId = integer(body.mainSubscriptionId, '费用归属会员', 1)
+    const member = db
+      .prepare(
+        'SELECT 1 FROM joint_quote_items WHERE joint_quote_id = ? AND subscription_id = ?',
+      )
+      .get(id, mainSubscriptionId)
+    if (!member) {
+      throw new HttpError(400, '费用归属会员必须在报价会员中')
+    }
+
+    // 套餐成员和时长属于创建时的组合信息，编辑只更新报价本身。
+    db.prepare(
+      `UPDATE joint_quotes
+       SET captured_at = ?, total = ?, main_subscription_id = ?, cost_mode = ?,
+           platform = ?, note = ?
+       WHERE id = ?`,
+    ).run(capturedAt, total, mainSubscriptionId, mode, platform, note, id)
+
+    res.json(buildState())
   }),
 )
 

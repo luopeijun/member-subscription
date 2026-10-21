@@ -15,7 +15,9 @@ type CompareProps = {
   onSnapshot: (plan: Plan) => void
   onDeletePlan: (plan: Plan) => void
   onDeleteSnapshot: (snapshot: Snapshot) => void
+  onEditSnapshot: (snapshot: Snapshot) => void
   onAddJointQuote: () => void
+  onEditJointQuote: (jointQuote: JointQuote) => void
   onDeleteJointQuote: (jointQuote: JointQuote) => void
 }
 
@@ -25,7 +27,9 @@ export function Compare({
   onSnapshot,
   onDeletePlan,
   onDeleteSnapshot,
+  onEditSnapshot,
   onAddJointQuote,
+  onEditJointQuote,
   onDeleteJointQuote,
 }: CompareProps) {
   const [query, setQuery] = useState('')
@@ -90,6 +94,7 @@ export function Compare({
               <JointQuoteCard
                 key={quote.id}
                 quote={quote}
+                onEdit={onEditJointQuote}
                 onDelete={onDeleteJointQuote}
               />
             ))}
@@ -142,6 +147,7 @@ export function Compare({
                   onSnapshot={onSnapshot}
                   onDeletePlan={onDeletePlan}
                   onDeleteSnapshot={onDeleteSnapshot}
+                  onEditSnapshot={onEditSnapshot}
                 />
               ))}
             </div>
@@ -149,7 +155,11 @@ export function Compare({
         ))
       )}
 
-      <SnapshotHistory snapshots={history} onDelete={onDeleteSnapshot} />
+      <SnapshotHistory
+        snapshots={history}
+        onEdit={onEditSnapshot}
+        onDelete={onDeleteSnapshot}
+      />
     </div>
   )
 }

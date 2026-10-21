@@ -6,10 +6,15 @@ import './SnapshotHistory.scss'
 
 type SnapshotHistoryProps = {
   snapshots: Snapshot[]
+  onEdit: (snapshot: Snapshot) => void
   onDelete: (snapshot: Snapshot) => void
 }
 
-export function SnapshotHistory({ snapshots, onDelete }: SnapshotHistoryProps) {
+export function SnapshotHistory({
+  snapshots,
+  onEdit,
+  onDelete,
+}: SnapshotHistoryProps) {
   if (snapshots.length === 0) return null
 
   return (
@@ -37,9 +42,14 @@ export function SnapshotHistory({ snapshots, onDelete }: SnapshotHistoryProps) {
               </span>
             </div>
             <span className="history-price">{formatCNY(snapshot.price)}</span>
-            <button className="btn sm danger" onClick={() => onDelete(snapshot)}>
-              删除
-            </button>
+            <span className="history-actions">
+              <button className="btn sm" onClick={() => onEdit(snapshot)}>
+                编辑
+              </button>
+              <button className="btn sm danger" onClick={() => onDelete(snapshot)}>
+                删除
+              </button>
+            </span>
           </div>
         ))}
       </div>
