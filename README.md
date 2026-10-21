@@ -184,11 +184,14 @@ PORT=8080 HOST=0.0.0.0 npm start
 | `npm start` | 生产模式，服务 `dist/` 和 API |
 | `npm test` | 运行全部测试 |
 | `npm run test:watch` | 监听文件变化并运行测试 |
+| `npm run test:coverage` | 运行测试并生成覆盖率报告到 `coverage/` |
 | `npm run typecheck` | 只做 TypeScript 类型检查 |
 
 ## 测试
 
 `npm test` 会运行 `tests/` 下的 Vitest 测试，目前共 26 个测试文件、207 个测试，覆盖金额换算、日期与周期、续费预测、报价校验与分摊、排序、导入导出、标签页记忆，以及服务端参数校验、联合报价费用分摊和状态聚合。组件测试使用 jsdom 和 Testing Library 覆盖会员、支付、联合续费和联合报价表单，总览支出视图切换，比价页独立分页，以及会员页固定每页 9 条。
+
+覆盖率统计和缺口分析见 [`TEST_REPORT.md`](./TEST_REPORT.md)。`npm run test:coverage` 会在 `coverage/` 下生成 HTML 报告，入口为 `coverage/index.html`。
 
 涉及数据库的测试会通过 `SUBLEDGER_DB_PATH` 指向临时 SQLite 文件，不会读写 `data/app.db`。
 
