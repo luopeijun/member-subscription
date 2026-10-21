@@ -3,10 +3,20 @@ import type {
   JointQuote,
   JointQuoteItem,
   Plan,
+  Service,
   Snapshot,
   Stats,
   Subscription,
 } from '@/types'
+
+export function makeService(overrides: Partial<Service> = {}): Service {
+  return {
+    id: 1,
+    name: '测试服务',
+    category: '其他',
+    ...overrides,
+  }
+}
 
 export function makePlan(overrides: Partial<Plan> = {}): Plan {
   return {
