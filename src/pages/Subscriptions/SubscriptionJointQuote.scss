@@ -1,0 +1,129 @@
+.sub-joint {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 11px;
+  background: #fbfcff;
+  border: 1px solid #e8ecf5;
+  border-radius: 10px;
+}
+
+.sub-joint-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sub-joint-title {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.sub-joint-hint {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.sub-joint-toggle {
+  margin-left: auto;
+}
+
+.sub-joint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sub-joint-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.sub-joint-entry:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sub-joint-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sub-joint-meta strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.sub-joint-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sub-joint-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sub-joint-metrics > div > span:first-child {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.sub-joint-metrics strong {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.sub-joint-metrics .badge {
+  align-self: flex-start;
+  width: fit-content;
+}
+
+.sub-joint-companions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sub-joint-companions-label {
+  flex: none;
+  font-weight: 600;
+}
+
+.sub-joint-companion {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #f1f3f7;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+@media (max-width: 520px) {
+  .sub-joint-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sub-joint-metrics > div:last-child {
+    grid-column: span 2;
+  }
+}
