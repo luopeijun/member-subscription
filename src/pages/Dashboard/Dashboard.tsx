@@ -411,7 +411,7 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
               <BarChart
                 data={topData}
                 layout="vertical"
-                margin={{ top: 4, right: 76, bottom: 4, left: 0 }}
+                margin={{ top: 4, right: 16, bottom: 4, left: 0 }}
                 barCategoryGap="30%"
                 accessibilityLayer={false}
               >
@@ -437,9 +437,8 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
                 <Bar
                   dataKey="monthly"
                   fill="url(#topBarGradient)"
-                  radius={[0, 7, 7, 0]}
-                  barSize={14}
-                  background={{ fill: '#f1f3f7', radius: 999 }}
+                  radius={[8, 8, 8, 8]}
+                  barSize={16}
                   isAnimationActive={false}
                 >
                   <LabelList
@@ -455,17 +454,18 @@ export function Dashboard({ state, onAdd, onSeed, onRenew }: DashboardProps) {
                         }
                       const item = topData[index ?? -1]
                       if (!item) return null
+                      const inside = width >= 58
                       return (
-                        <g
-                          transform={`translate(${x + width + 10}, ${y + height / 2})`}
+                        <text
+                          className={
+                            inside ? 'top-label-inside' : 'top-label-outside'
+                          }
+                          x={inside ? x + width - 12 : x + width + 8}
+                          y={y + height / 2 + 4}
+                          textAnchor={inside ? 'end' : 'start'}
                         >
-                          <text className="top-label-value" x={0} y={-2}>
-                            {formatCNY(item.monthly)}
-                          </text>
-                          <text className="top-label-share" x={0} y={11}>
-                            {item.share}%
-                          </text>
-                        </g>
+                          {formatCNY(item.monthly)}
+                        </text>
                       )
                     }}
                   />
