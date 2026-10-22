@@ -22,7 +22,12 @@ export default defineConfig({
   test: {
     coverage: {
       provider: 'istanbul',
-      include: ['src/**/*.{ts,tsx}', 'server/**/*.ts', 'shared/**/*.ts'],
+      include: [
+        'src/**/*.{ts,tsx}',
+        'server/**/*.ts',
+        'shared/**/*.ts',
+        'electron/desktop.ts',
+      ],
       exclude: ['tests/**'],
       all: true,
       reporter: ['text', 'html'],
