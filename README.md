@@ -10,8 +10,8 @@
 
 Windows 桌面版（当前版本 `0.1.0`）发布在 [GitHub Releases](https://github.com/luopeijun/member-subscription/releases/latest)：
 
-- `会员订阅-0.1.0-setup.exe`：安装版，可选择安装目录并创建快捷方式
-- `会员订阅-0.1.0-portable.exe`：便携版，双击直接运行
+- `member-subscription-0.1.0-setup.exe`：安装版，可选择安装目录并创建快捷方式
+- `member-subscription-0.1.0-portable.exe`：便携版，双击直接运行
 
 安装包没有代码签名，Windows 可能提示“未知发布者”，选择“仍要运行”即可。首次启动时可以把旧的 `data/app.db` 导入桌面版，旧数据不会被删除。
 
@@ -205,8 +205,8 @@ npm run desktop:pack
 
 产物位于 `release/`：
 
-- `会员订阅-0.1.0-setup.exe`：安装版，可选择安装目录并创建快捷方式
-- `会员订阅-0.1.0-portable.exe`：便携版，双击直接运行
+- `member-subscription-0.1.0-setup.exe`：安装版，可选择安装目录并创建快捷方式
+- `member-subscription-0.1.0-portable.exe`：便携版，双击直接运行
 
 安装版和便携版都不需要预先安装 Node.js。
 
