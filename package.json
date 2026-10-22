@@ -79,10 +79,10 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "artifactName": "${name}-${version}-${arch}.${ext}"
     },
     "nsis": {
-      "artifactName": "${productName}-${version}-setup.${ext}",
+      "artifactName": "${name}-${version}-setup.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
@@ -91,7 +91,7 @@
       "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
+      "artifactName": "${name}-${version}-portable.${ext}"
     }
   }
 }
