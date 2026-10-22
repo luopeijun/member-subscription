@@ -4,8 +4,8 @@
 
 ## 测试结果
 
-- 测试文件：31 个
-- 测试用例：234 个
+- 测试文件：32 个
+- 测试用例：243 个
 - 结果：全部通过
 - 统计范围：`src/`、`server/`、`shared/` 全部源文件，以及 `electron/desktop.ts`；排除 `tests/` 和样式文件
 - 覆盖率工具：Vitest + Istanbul
@@ -15,10 +15,10 @@
 
 | 指标 | 覆盖率 | 已覆盖 / 总数 |
 |---|---:|---:|
-| 语句 Statements | 70.62% | 1592 / 2254 |
-| 分支 Branches | 60.36% | 1179 / 1953 |
-| 函数 Functions | 67% | 394 / 588 |
-| 行 Lines | 70.92% | 1432 / 2019 |
+| 语句 Statements | 74.84% | 1687 / 2254 |
+| 分支 Branches | 65.18% | 1273 / 1953 |
+| 函数 Functions | 72.95% | 429 / 588 |
+| 行 Lines | 75.08% | 1516 / 2019 |
 
 ## 分层覆盖率
 
@@ -26,11 +26,11 @@
 |---|---:|---:|---:|---:|---:|
 | `shared/` | 2 | 100% | 100% | 100% | 100% |
 | `electron/desktop.ts` | 1 | 100% | 91.66% | 100% | 100% |
-| `src/utils/` | 12 | 96.25% | 93.84% | 97.91% | 96.46% |
-| `src/components/` | 23 | 63.74% | 62.40% | 65.88% | 64.38% |
-| `server/` | 11 | 89.08% | 77.91% | 96.81% | 89.71% |
-| `src/pages/` | 11 | 41.50% | 22.01% | 38.98% | 42.28% |
-| `src/` 入口与 API | 4 | 3.14% | 0% | 0% | 3.37% |
+| `src/utils/` | 12 | 96.25% | 93.85% | 97.92% | 96.46% |
+| `src/components/` | 23 | 64.07% | 62.56% | 66.82% | 64.74% |
+| `server/` | 11 | 89.09% | 77.92% | 96.82% | 89.71% |
+| `src/pages/` | 11 | 71.90% | 44.26% | 66.95% | 72.43% |
+| `src/` 入口与 API | 4 | 3.14% | 0% | 0% | 3.38% |
 
 ## 覆盖较好的部分
 
@@ -52,14 +52,14 @@
   - `SubscriptionForm`：80.64%
   - `JointQuoteForm`：80.53%
   - `JointRenewForm`：85.85%
-- 通用组件：`Pagination` 93.75%，`Modal`、`FlowTabs`、`EmptyState` 等基础路径覆盖良好
+- 流水页：`Payments.tsx`、`PaymentRow.tsx`、`JointRenewalCard.tsx` 均为 100%，覆盖搜索、日期筛选、反向日期校验、双流水切换、独立分页和删除回调
+- 通用组件：`Pagination` 93.75%，`FlowTabs`、`EmptyState`、`SearchBox` 等基础路径覆盖良好
 
 ## 主要缺口
 
 | 文件 | 行覆盖率 | 未覆盖行数 | 说明 |
 |---|---:|---:|---|
 | `src/App.tsx` | 0% | 134 | 应用入口、全局状态和页面切换未做集成测试 |
-| `src/pages/Payments/Payments.tsx` | 0% | 77 | 支付流水筛选、搜索、分页未覆盖 |
 | `src/components/QuoteForm/QuoteForm.tsx` | 0% | 44 | 平台报价新增/编辑表单未覆盖 |
 | `src/components/QuoteFields/QuoteFields.tsx` | 0% | 16 | 报价字段组件未覆盖 |
 | `server/db.ts` | 45.45% | 48 | 数据库初始化和迁移分支覆盖较低 |
@@ -83,17 +83,16 @@
 
 ## 结论与建议
 
-当前测试对核心业务逻辑和服务端 API 主流程覆盖较好，工具函数、金额与周期计算、报价分摊、导入导出、状态聚合、桌面数据导入都比较扎实；整体行覆盖率已提升到 70.92%。剩余缺口主要集中在页面级组件、应用入口和前端 API 客户端。
+当前测试对核心业务逻辑和服务端 API 主流程覆盖较好，工具函数、金额与周期计算、报价分摊、导入导出、状态聚合、桌面数据导入都比较扎实；整体行覆盖率已提升到 75.08%，语句覆盖率 74.84%。支付流水页已经达到 100%，剩余缺口主要集中在页面级组件、应用入口和前端 API 客户端。
 
-如果目标是继续提升到 75% 左右，优先级建议：
+如果目标是继续提升到 80% 左右，优先级建议：
 
-1. `Payments` 页面筛选、搜索、分页
-2. `QuoteForm` + `QuoteFields`
-3. `App.tsx` / `AppModals` 主要流程
-4. `Dashboard`、`Compare`、`Subscriptions` 的分支和交互
-5. `server/db.ts` 数据库迁移分支
+1. `QuoteForm` + `QuoteFields`
+2. `App.tsx` / `AppModals` 主要流程
+3. `Dashboard`、`Compare`、`Subscriptions` 的分支和交互
+4. `server/db.ts` 数据库迁移分支
 
-如果目标是 80% 以上，再补 `SelectMenu`、`SearchBox`、`ConfirmDialog`、`ResetDataDialog`、`Toast` 等通用组件。
+如果目标是 85% 以上，再补 `SelectMenu`、`ConfirmDialog`、`ResetDataDialog`、`Toast` 等通用组件。
 
 ## 运行方式
 
