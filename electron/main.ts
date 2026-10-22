@@ -10,6 +10,12 @@ import {
 import fs from 'node:fs'
 import type { Server } from 'node:http'
 import path from 'node:path'
+import {
+  findLegacyDatabase,
+  importDatabase,
+  isSameOrigin,
+  resolveDataDir,
+} from './desktop'
 
 const APP_NAME = '会员订阅'
 const APP_ID = 'com.luopeijun.member-subscription'
@@ -77,7 +83,10 @@ async function startDesktopApp(): Promise<void> {
     throw new Error(`找不到前端构建产物：${staticDir}\n请先运行 npm run build。`)
   }
 
-  dataDir = resolveDataDir()
+  dataDir = resolveDataDir(
+    process.env.SUBLEDGER_DESKTOP_DATA_DIR,
+    path.join(app.getPath('userData'), 'data'),
+  )
   fs.mkdirSync(dataDir, { recursive: true })
 
   const dbPath = path.join(dataDir, 'app.db')
@@ -102,17 +111,13 @@ async function startDesktopApp(): Promise<void> {
   createMainWindow()
 }
 
-function resolveDataDir(): string {
-  const override = process.env.SUBLEDGER_DESKTOP_DATA_DIR?.trim()
-  return override
-    ? path.resolve(override)
-    : path.join(app.getPath('userData'), 'data')
-}
-
 async function maybeImportLegacyDatabase(targetDbPath: string): Promise<void> {
   if (fs.existsSync(targetDbPath)) return
 
-  const legacyDbPath = findLegacyDatabase(targetDbPath)
+  const legacyDbPath = findLegacyDatabase(targetDbPath, [
+    path.join(process.cwd(), 'data', 'app.db'),
+    path.join(path.dirname(app.getPath('exe')), 'data', 'app.db'),
+  ])
   if (legacyDbPath) {
     const result = await dialog.showMessageBox({
       type: 'question',
@@ -153,48 +158,6 @@ async function maybeImportLegacyDatabase(targetDbPath: string): Promise<void> {
   await importDatabase(source, targetDbPath)
 }
 
-async function importDatabase(sourceDbPath: string, targetDbPath: string): Promise<void> {
-  if (path.resolve(sourceDbPath) === path.resolve(targetDbPath)) return
-
-  fs.mkdirSync(path.dirname(targetDbPath), { recursive: true })
-  const suffixes = ['', '-wal', '-shm']
-  try {
-    fs.rmSync(`${targetDbPath}-wal`, { force: true })
-    fs.rmSync(`${targetDbPath}-shm`, { force: true })
-    for (const suffix of suffixes) {
-      const source = `${sourceDbPath}${suffix}`
-      if (fs.existsSync(source)) {
-        fs.copyFileSync(source, `${targetDbPath}${suffix}`)
-      }
-    }
-  } catch (error) {
-    for (const suffix of suffixes) {
-      fs.rmSync(`${targetDbPath}${suffix}`, { force: true })
-    }
-    throw new Error(
-      `导入旧版数据失败：${error instanceof Error ? error.message : String(error)}`,
-    )
-  }
-}
-
-function findLegacyDatabase(targetDbPath: string): string | null {
-  const target = path.resolve(targetDbPath)
-  const candidates = [
-    path.join(process.cwd(), 'data', 'app.db'),
-    path.join(path.dirname(app.getPath('exe')), 'data', 'app.db'),
-  ]
-
-  for (const candidate of candidates) {
-    if (path.resolve(candidate) === target) continue
-    try {
-      if (fs.statSync(candidate).isFile()) return candidate
-    } catch {
-      // 路径不存在时继续检查下一个候选位置。
-    }
-  }
-  return null
-}
-
 function createMainWindow(): void {
   const options: BrowserWindowConstructorOptions = {
     width: 1200,
@@ -225,7 +188,7 @@ function createMainWindow(): void {
   })
 
   window.webContents.on('will-navigate', (event, url) => {
-    if (!isAppUrl(url)) {
+    if (!isSameOrigin(url, appUrl)) {
       event.preventDefault()
       void openExternal(url)
     }
@@ -237,14 +200,6 @@ function createMainWindow(): void {
   })
 
   void window.loadURL(appUrl)
-}
-
-function isAppUrl(url: string): boolean {
-  try {
-    return new URL(url).origin === new URL(appUrl).origin
-  } catch {
-    return false
-  }
 }
 
 async function openExternal(url: string): Promise<void> {
