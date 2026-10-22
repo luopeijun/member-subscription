@@ -2,6 +2,9 @@ import type {
   AppState,
   JointQuote,
   JointQuoteItem,
+  JointRenewal,
+  JointRenewalMember,
+  Payment,
   Plan,
   Service,
   Snapshot,
@@ -107,6 +110,50 @@ export function makeJointQuote(overrides: Partial<JointQuote> = {}): JointQuote 
     platform: null,
     note: null,
     items: [],
+    ...overrides,
+  }
+}
+
+export function makePayment(overrides: Partial<Payment> = {}): Payment {
+  return {
+    id: 1,
+    subscriptionId: 1,
+    serviceName: '测试服务',
+    planName: '标准版',
+    paidAt: '2026-01-01',
+    amount: 1000,
+    note: null,
+    jointRenewalId: null,
+    ...overrides,
+  }
+}
+
+export function makeJointRenewalMember(
+  overrides: Partial<JointRenewalMember> = {},
+): JointRenewalMember {
+  return {
+    subscriptionId: 1,
+    serviceName: '测试服务',
+    planName: '标准版',
+    amount: 500,
+    durationDays: 365,
+    ...overrides,
+  }
+}
+
+export function makeJointRenewal(
+  overrides: Partial<JointRenewal> = {},
+): JointRenewal {
+  return {
+    id: 1,
+    mainSubscriptionId: 1,
+    mainServiceName: '测试服务',
+    paidAt: '2026-01-01',
+    total: 1000,
+    cycleMonths: 12,
+    costMode: 'split',
+    note: null,
+    members: [makeJointRenewalMember()],
     ...overrides,
   }
 }
