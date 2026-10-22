@@ -4,8 +4,8 @@
 
 ## 测试结果
 
-- 测试文件：30 个
-- 测试用例：219 个
+- 测试文件：31 个
+- 测试用例：234 个
 - 结果：全部通过
 - 统计范围：`src/`、`server/`、`shared/` 全部源文件，以及 `electron/desktop.ts`；排除 `tests/` 和样式文件
 - 覆盖率工具：Vitest + Istanbul
@@ -15,10 +15,10 @@
 
 | 指标 | 覆盖率 | 已覆盖 / 总数 |
 |---|---:|---:|
-| 语句 Statements | 57.45% | 1295 / 2254 |
-| 分支 Branches | 52.27% | 1021 / 1953 |
-| 函数 Functions | 58.50% | 344 / 588 |
-| 行 Lines | 56.95% | 1150 / 2019 |
+| 语句 Statements | 70.62% | 1592 / 2254 |
+| 分支 Branches | 60.36% | 1179 / 1953 |
+| 函数 Functions | 67% | 394 / 588 |
+| 行 Lines | 70.92% | 1432 / 2019 |
 
 ## 分层覆盖率
 
@@ -26,9 +26,9 @@
 |---|---:|---:|---:|---:|---:|
 | `shared/` | 2 | 100% | 100% | 100% | 100% |
 | `electron/desktop.ts` | 1 | 100% | 91.66% | 100% | 100% |
-| `src/utils/` | 12 | 96.25% | 93.85% | 97.92% | 96.46% |
+| `src/utils/` | 12 | 96.25% | 93.84% | 97.91% | 96.46% |
 | `src/components/` | 23 | 63.74% | 62.40% | 65.88% | 64.38% |
-| `server/` | 11 | 55.68% | 53.34% | 64.96% | 54.77% |
+| `server/` | 11 | 89.08% | 77.91% | 96.81% | 89.71% |
 | `src/pages/` | 11 | 41.50% | 22.01% | 38.98% | 42.28% |
 | `src/` 入口与 API | 4 | 3.14% | 0% | 0% | 3.37% |
 
@@ -42,9 +42,11 @@
   - `allocation.ts`：100%
   - `errors.ts`：100%
   - `util.ts`：100%
+  - `seed.ts`：100%
+  - `api.ts`：94.39% 语句 / 96.01% 行，72.91% 分支（会员、支付、联合续费、套餐比价、联合报价、导入导出、清空和示例数据主流程）
+  - `store.ts`：100% 语句 / 100% 行，82.11% 分支
   - `app.ts`：100% 语句 / 100% 行，90% 分支（本地服务启动、静态回退和关闭）
-  - `store.ts`：94.05% 语句
-  - `transfer.ts`：95.60% 语句
+  - `transfer.ts`：95.60% 语句 / 96.51% 行，81.09% 分支
   - `db.ts`：51.78% 语句 / 45.45% 行（配置路径、WAL、外键和关闭已覆盖）
 - 主要表单：
   - `SubscriptionForm`：80.64%
@@ -56,15 +58,14 @@
 
 | 文件 | 行覆盖率 | 未覆盖行数 | 说明 |
 |---|---:|---:|---|
-| `server/api.ts` | 10.29% | 270 | 只覆盖了状态读取和参数错误路径，其余 Express 路由仍未做集成测试 |
 | `src/App.tsx` | 0% | 134 | 应用入口、全局状态和页面切换未做集成测试 |
 | `src/pages/Payments/Payments.tsx` | 0% | 77 | 支付流水筛选、搜索、分页未覆盖 |
 | `src/components/QuoteForm/QuoteForm.tsx` | 0% | 44 | 平台报价新增/编辑表单未覆盖 |
 | `src/components/QuoteFields/QuoteFields.tsx` | 0% | 16 | 报价字段组件未覆盖 |
 | `server/db.ts` | 45.45% | 48 | 数据库初始化和迁移分支覆盖较低 |
 | `src/pages/Dashboard/Dashboard.tsx` | 59.25% | 22 | 图表分支和部分交互未覆盖 |
-| `server/seed.ts` | 5.26% | 18 | 示例数据载入未覆盖 |
 | `server/index.ts` | 0% | 17 | 服务启动入口未覆盖 |
+| `src/api.ts` | 0% | 17 | 前端 API 客户端未直接覆盖 |
 | `src/components/AppModals/AppModals.tsx` | 0% | 13 | 全局弹窗调度未覆盖 |
 | `src/pages/Compare/PlanJointQuote.tsx` | 0% | 10 | 比价页联合报价区域未覆盖 |
 | `src/pages/Compare/OfferRow.tsx` | 0% | 8 | 报价行交互未覆盖 |
@@ -74,21 +75,23 @@
 | `src/components/PaymentForm.tsx` | 64.28% | 35 | 主流程已覆盖，但异常和分支覆盖不足 |
 | `src/pages/Subscriptions/SubscriptionCard.tsx` | 25% | 3 | 卡片操作分支覆盖不足 |
 
+`server/api.ts` 的主流程已经覆盖，剩余未覆盖分支主要是联合报价编辑异常、部分 404 和参数校验组合。
+
 展示型组件基本未覆盖：`ConfirmDialog`、`ResetDataDialog`、`Toast`、`Topbar`、`BootScreen`、`InfoTip`、`PageHeader`，以及 `Badge` 的部分分支。
 
 `electron/main.ts` 的窗口、菜单、对话框和单实例生命周期不在单元测试覆盖率内，由 `npm run desktop -- --smoke-test` 和实际打包运行验证；可测试的数据目录、旧库导入和同源判断已拆到 `electron/desktop.ts`。
 
 ## 结论与建议
 
-当前测试对核心业务逻辑覆盖较好，工具函数、金额与周期计算、报价分摊、导入导出、状态聚合都比较扎实；桌面数据目录、旧库导入和同源判断也已纳入测试。整体行覆盖率主要被页面级组件、应用入口和服务端路由层拉低。
+当前测试对核心业务逻辑和服务端 API 主流程覆盖较好，工具函数、金额与周期计算、报价分摊、导入导出、状态聚合、桌面数据导入都比较扎实；整体行覆盖率已提升到 70.92%。剩余缺口主要集中在页面级组件、应用入口和前端 API 客户端。
 
-如果要提升到 70% 左右，优先级建议：
+如果目标是继续提升到 75% 左右，优先级建议：
 
-1. `server/api.ts` 路由集成测试
-2. `Payments` 页面筛选、搜索、分页
-3. `QuoteForm` + `QuoteFields`
-4. `App.tsx` / `AppModals` 主要流程
-5. `Dashboard`、`Compare`、`Subscriptions` 的分支和交互
+1. `Payments` 页面筛选、搜索、分页
+2. `QuoteForm` + `QuoteFields`
+3. `App.tsx` / `AppModals` 主要流程
+4. `Dashboard`、`Compare`、`Subscriptions` 的分支和交互
+5. `server/db.ts` 数据库迁移分支
 
 如果目标是 80% 以上，再补 `SelectMenu`、`SearchBox`、`ConfirmDialog`、`ResetDataDialog`、`Toast` 等通用组件。
 
