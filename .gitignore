@@ -3,6 +3,8 @@ node_modules/
 
 # 构建产物
 dist/
+dist-electron/
+release/
 coverage/
 
 # 本地数据库（个人数据，不提交）

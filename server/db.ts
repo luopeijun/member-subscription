@@ -1,11 +1,10 @@
 import Database from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-const projectRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const defaultDbPath = path.join(projectRoot, 'data', 'app.db')
-// 测试通过 SUBLEDGER_DB_PATH 指向临时数据库，避免读写真实数据。
+// 桌面版由 Electron 在加载服务端前把 SUBLEDGER_DB_PATH 指向用户数据目录。
+// Web 版和测试仍以项目根目录为基准；测试会显式覆盖为临时数据库。
+const defaultDbPath = path.join(process.cwd(), 'data', 'app.db')
 const configuredDbPath = process.env.SUBLEDGER_DB_PATH?.trim()
 
 export const dbPath = configuredDbPath
@@ -373,3 +372,7 @@ db.exec(
    )
    WHERE main_subscription_id IS NULL`,
 )
+
+export function closeDb(): void {
+  if (db.open) db.close()
+}
