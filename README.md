@@ -4,6 +4,8 @@
 
 数据保存在本机 SQLite 中，不需要注册账号，也不依赖云服务。适合个人整理各类会员、订阅和长期服务的实际支出。
 
+既可以按 Web 方式在浏览器中使用，也可以打包成 Windows 桌面应用；桌面版双击即可打开，关闭后数据仍会保留在本机。
+
 ## 功能总览
 
 | 页面 | 能做什么 |
@@ -104,7 +106,7 @@
 
 导入采用追加方式，不会覆盖已有记录。服务和套餐会按名称、周期匹配后复用或新建；会员、支付、联合续费、报价等记录会追加导入。兼容旧版备份中的历史字段。
 
-清空全部数据需要二次确认，并会先在 `data/backups` 自动生成一份数据库快照。该操作不可撤销，建议同时使用「导出数据」自行保留一份 JSON。
+清空全部数据需要二次确认，并会先在当前数据目录的 `backups` 中自动生成一份数据库快照。该操作不可撤销，建议同时使用「导出数据」自行保留一份 JSON。
 
 ## 核心规则
 
@@ -147,6 +149,7 @@
 - 样式：SCSS
 - 图表：Recharts（分类环形图、会员 Top 6、月度支出图）
 - 测试：Vitest（金额、日期、周期、续费预测和报价等工具函数）
+- 桌面端：Electron + electron-builder，使用 esbuild 打包主进程和本地服务
 - 开发模式下 Vite 以中间件方式运行在 Express 中，前后端同端口
 
 ## 快速开始
@@ -175,6 +178,45 @@ npm start
 PORT=8080 HOST=0.0.0.0 npm start
 ```
 
+## Windows 桌面版
+
+桌面版会把前端、Express 服务和 SQLite 一起放进 Electron 应用中，启动后直接打开应用窗口，不需要浏览器或终端。
+
+构建并本地运行：
+
+```bash
+npm run desktop
+```
+
+生成安装包和便携版：
+
+```bash
+npm run desktop:pack
+```
+
+产物位于 `release/`：
+
+- `会员订阅-0.1.0-setup.exe`：安装版，可选择安装目录并创建快捷方式
+- `会员订阅-0.1.0-portable.exe`：便携版，双击直接运行
+
+安装版和便携版都不需要预先安装 Node.js。
+
+桌面版数据保存在：
+
+```text
+%APPDATA%\会员订阅\data\app.db
+```
+
+清空数据前的自动快照位于 `%APPDATA%\会员订阅\data\backups\`。应用菜单「文件 → 打开数据目录」可以直接打开该文件夹。
+
+首次启动时，如果当前工作目录或 EXE 所在目录存在旧的 `data/app.db`，应用会提示是否把旧数据复制到桌面版；没有自动检测到时，也可以在欢迎弹窗中选择旧数据库文件，或从零开始。旧数据不会被删除。也可以先在网页版「导出数据」，再在桌面版「导入数据」。
+
+构建说明：
+
+- `npm run desktop:pack` 会临时把 `better-sqlite3` 切换为 Electron ABI 的预编译模块，打包完成后自动恢复 Node.js 版本。
+- 如果构建或运行被强制中断，可执行 `npm run desktop:restore` 恢复 Node.js 原生模块，避免影响 `npm test`。
+- Electron 33 使用 Node 20 ABI，已匹配 `better-sqlite3` 的 `electron-v130-win32-x64` 预编译包。
+
 ## 常用脚本
 
 | 命令 | 说明 |
@@ -182,6 +224,10 @@ PORT=8080 HOST=0.0.0.0 npm start
 | `npm run dev` | 开发模式，Vite + API 同一进程 |
 | `npm run build` | TypeScript 检查并构建前端 |
 | `npm start` | 生产模式，服务 `dist/` 和 API |
+| `npm run build:desktop` | 构建前端、Electron 主进程和本地服务 |
+| `npm run desktop` | 构建并启动桌面版 |
+| `npm run desktop:pack` | 生成 Windows 安装包和便携版 |
+| `npm run desktop:restore` | 恢复 `better-sqlite3` 的 Node.js 原生模块 |
 | `npm test` | 运行全部测试 |
 | `npm run test:watch` | 监听文件变化并运行测试 |
 | `npm run test:coverage` | 运行测试并生成覆盖率报告到 `coverage/` |
@@ -189,7 +235,7 @@ PORT=8080 HOST=0.0.0.0 npm start
 
 ## 测试
 
-`npm test` 会运行 `tests/` 下的 Vitest 测试，目前共 26 个测试文件、207 个测试，覆盖金额换算、日期与周期、续费预测、报价校验与分摊、排序、导入导出、标签页记忆，以及服务端参数校验、联合报价费用分摊和状态聚合。组件测试使用 jsdom 和 Testing Library 覆盖会员、支付、联合续费和联合报价表单，总览支出视图切换，比价页独立分页，以及会员页固定每页 9 条。
+`npm test` 会运行 `tests/` 下的 Vitest 测试，目前共 27 个测试文件、210 个测试，覆盖金额换算、日期与周期、续费预测、报价校验与分摊、排序、导入导出、标签页记忆，以及服务端参数校验、联合报价费用分摊、状态聚合、本地服务启动和静态页面回退。组件测试使用 jsdom 和 Testing Library 覆盖会员、支付、联合续费和联合报价表单，总览支出视图切换，比价页独立分页，以及会员页固定每页 9 条。
 
 覆盖率统计和缺口分析见 [`TEST_REPORT.md`](./TEST_REPORT.md)。`npm run test:coverage` 会在 `coverage/` 下生成 HTML 报告，入口为 `coverage/index.html`。
 
@@ -197,8 +243,9 @@ PORT=8080 HOST=0.0.0.0 npm start
 
 ## 数据与备份
 
-- 数据库文件：`data/app.db`
-- 清空前的自动快照：`data/backups/app-*.db`
+- Web 版数据库：`data/app.db`
+- 桌面版数据库：`%APPDATA%\会员订阅\data\app.db`
+- 清空前的自动快照：Web 版为 `data/backups/app-*.db`，桌面版为 `%APPDATA%\会员订阅\data\backups\app-*.db`
 - `data/` 已加入 `.gitignore`，个人数据不会提交
 - 导出的 JSON 包含服务、套餐、会员、支付、联合续费、平台报价和联合报价
 - 导入为追加式，不会覆盖已有数据
@@ -214,7 +261,16 @@ server/
   store.ts      聚合前端所需的完整状态和统计
   transfer.ts   JSON 导入导出
   seed.ts       示例数据
-  index.ts      Express 服务与 Vite 中间件
+  app.ts        生产环境 Express 应用与启动/关闭接口
+  index.ts      Web 版 Express 服务与 Vite 中间件
+electron/
+  main.ts       Electron 主进程、窗口、菜单和数据目录
+scripts/
+  build-electron.mjs  esbuild 构建主进程和服务端
+  run-electron.mjs    切换原生模块并启动桌面版
+  package-electron.mjs 切换原生模块并调用 electron-builder
+  electron-native.mjs better-sqlite3 ABI 切换与恢复
+build/          应用图标等打包资源
 shared/
   money.ts      分 / 元转换与金额格式化
   duration.ts   时长、日期与快捷选项
@@ -265,3 +321,4 @@ src/
 - [x] 联合报价：按会员实际时长对比当前组合成本，并展示分摊后的等效月成本；支持编辑报价信息
 - [x] 可搜索的会员选择器，约 10 条后滚动
 - [x] JSON 导出、追加导入和清空前自动备份
+- [x] Windows 桌面版：安装包、便携版、本地数据目录和旧数据导入提示
